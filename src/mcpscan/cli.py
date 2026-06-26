@@ -19,13 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mcpscan",
         description=(
-            "Local-first, offline-by-default security posture scanner for "
-            "MCP / local-agent setups."
+            "Local-first, offline-by-default security posture scanner for MCP / local-agent setups."
         ),
     )
-    parser.add_argument(
-        "--version", action="version", version=f"mcpscan {__version__}"
-    )
+    parser.add_argument("--version", action="version", version=f"mcpscan {__version__}")
     parser.add_argument(
         "command",
         nargs="?",
