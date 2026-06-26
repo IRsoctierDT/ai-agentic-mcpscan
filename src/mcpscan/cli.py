@@ -9,9 +9,9 @@ offline-by-default, stateless trust properties.
 from __future__ import annotations
 
 import argparse
-import sys
 
 from . import __version__
+from .domain import Report, Severity
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -47,12 +47,37 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # args.command == "scan"
-    print(
-        "AI Agentic MCPscan: the scanner engine is not yet implemented "
-        "(specification complete; build pending — see docs/BACKLOG.md).",
-        file=sys.stderr,
+    from .engine import scan
+
+    report = scan()
+    _print_summary(report)
+    # Exit non-zero if any finding is at/above the threshold (CI-friendly).
+    has_serious = any(
+        f.severity in (Severity.CRITICAL, Severity.HIGH) for s in report.servers for f in s.findings
     )
-    return 2
+    return 1 if has_serious else 0
+
+
+def _print_summary(report: Report) -> None:
+    """Concise terminal summary. Rich terminal/HTML/JSON renderers land in Sprint 3."""
+    print(f"AI Agentic MCPscan — overall posture: {report.overall_grade}")
+    findings = [(s, f) for s in report.servers for f in s.findings]
+    if not findings:
+        print("No findings. (Note: rich reporting arrives in Sprint 3.)")
+        return
+    order = {
+        Severity.CRITICAL: 0,
+        Severity.HIGH: 1,
+        Severity.MEDIUM: 2,
+        Severity.LOW: 3,
+        Severity.INFO: 4,
+    }
+    for server, finding in sorted(findings, key=lambda sf: order[sf[1].severity]):
+        loc = finding.location.path
+        if finding.location.line is not None:
+            loc = f"{loc}:{finding.location.line}"
+        print(f"  [{finding.severity.value.upper():8}] {finding.title}  ({loc})")
+        print(f"             fix: {finding.remediation}")
 
 
 if __name__ == "__main__":  # pragma: no cover
