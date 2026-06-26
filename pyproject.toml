@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-agentic-mcpscan"
+version = "0.0.0"
+description = "Local-first, offline-by-default security posture scanner for MCP / local-agent setups."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "IRsoctierDT" }]
+keywords = ["mcp", "security", "scanner", "posture", "agent", "llm"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+
+# Runtime deps are intentionally minimal and will be PINNED as the build lands.
+# psutil powers socket/process enumeration (the 0.0.0.0-exposure check).
+dependencies = [
+    "psutil>=5.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "bandit",
+    "pip-audit",
+]
+
+[project.urls]
+Homepage = "https://github.com/IRsoctierDT/ai-agentic-mcpscan"
+Repository = "https://github.com/IRsoctierDT/ai-agentic-mcpscan"
+Issues = "https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues"
+
+[project.scripts]
+mcpscan = "mcpscan.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcpscan"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Secrets / local config — never commit (this is a security tool; lead by example)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Tool output (stateless by design — never commit generated reports)
+*.mcpscan.html
+*.mcpscan.json
+
+# Claude Code local settings
+.claude/settings.local.json
