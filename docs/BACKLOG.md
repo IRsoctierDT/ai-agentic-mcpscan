@@ -105,9 +105,19 @@ REL=Release Engineer, CQ=Code Quality, ARCH=Principal Architect.
   *AC:* every finding type has a tested remediation string; no file writes.
   *Traces:* FR-R5.
 - **T-305 — `--show-secrets` gating + output file perms** (SEC/BE)
-  *AC:* default redacts; flag reveals masked/partial only + prints warning;
-  written files are `0600` where supported.
+  *AC:* default redacts; flag reveals masked/partial only (≤ first-2/last-2) +
+  prints warning; written files are `0600` where supported; `sha256_8`
+  documented as triage-only, not a security control (review F3).
   *Traces:* FR-R4, FR-R6.
+- **T-306 — Path privacy (review F1)** (BE)
+  Relativize home to `~/…` by default; `--absolute-paths` opt-in.
+  *AC:* home-dir finding renders `~/…` by default; flag shows full path.
+  *Traces:* FR-R7.
+- **T-212 — Test corpus: clean + golden fixtures (review F2)** (QA)
+  A clean/well-configured input per check that must yield **zero** findings, and
+  a golden fixed-input→byte-stable JSON test.
+  *AC:* no check fires on its clean fixture; golden JSON is byte-stable.
+  *Traces:* false-positive guard (DoD), FR-S2, FR-R3.
 
 ## Sprint 4 — Online enrichment, integration & hardening `[Sprint 4]`
 

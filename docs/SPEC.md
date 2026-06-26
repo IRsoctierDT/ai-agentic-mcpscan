@@ -163,6 +163,11 @@ agent can turn into a pass/fail test. `[online]` marks behavior gated behind
   files**.
 - **FR-R6 — Output file safety.** Any file the tool writes is created with
   owner-only permissions (`0600`) where the OS supports it.
+- **FR-R7 — Path privacy (review F1).** By default, rendered file paths are
+  relativized to the user's home (`~/…`) so reports are safe to share without
+  leaking the OS username; `--absolute-paths` opts back into full paths.
+  - AC: a finding under the home dir renders as `~/…` by default; `--absolute-paths`
+    shows the full path.
 
 ## 6. Scoring Rubric (proposed — confirm)
 
