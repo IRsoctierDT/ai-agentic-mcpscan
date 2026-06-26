@@ -63,6 +63,14 @@ def build_parser() -> argparse.ArgumentParser:
         default="high",
         help="Minimum severity that makes the command exit non-zero (default: high).",
     )
+    parser.add_argument(
+        "--online",
+        action="store_true",
+        help=(
+            "Enrich pinned packages with OSV advisories. Makes outbound requests "
+            "to api.osv.dev (sends only package name+version). Off by default."
+        ),
+    )
     return parser
 
 
@@ -88,8 +96,14 @@ def main(argv: list[str] | None = None) -> int:
             "warning: --show-secrets reveals masked secret values; keep the output private.",
             file=sys.stderr,
         )
+    if args.online:
+        print(
+            "note: --online contacts api.osv.dev with package name+version only "
+            "(no config contents, paths, or secrets).",
+            file=sys.stderr,
+        )
 
-    report = scan(roots=args.root)
+    report = scan(roots=args.root, online=args.online)
     opts = RenderOptions(
         show_secrets=args.show_secrets,
         absolute_paths=args.absolute_paths,

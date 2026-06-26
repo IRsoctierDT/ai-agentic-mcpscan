@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import platform
 import stat
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePath
 
 from .adapters.base import ParsedConfig
@@ -18,7 +18,12 @@ from .adapters.claude import ClaudeAdapter
 from .adapters.paths import project_config_candidates
 from .checks import EnvFile, parse_env_text
 from .checks.exposure import check_socket_exposure
-from .checks.pinning import check_server_pinning
+from .checks.pinning import (
+    PackageSpec,
+    check_server_pinning,
+    known_vuln_finding,
+    parse_package_spec,
+)
 from .checks.secrets import (
     check_env_file_secrets,
     check_secret_at_rest,
@@ -35,14 +40,19 @@ from .scoring import dimension_grades, grade_findings, worst_grade
 
 SCHEMA_VERSION = "1.0"
 
+# (name, version, ecosystem) -> (vuln_ids, any_critical)
+OsvFetch = Callable[[str, str, str], "tuple[tuple[str, ...], bool]"]
 
-def _audit_config(cfg: ParsedConfig) -> list[Server]:
+
+def _audit_config(cfg: ParsedConfig, osv_fetch: OsvFetch | None = None) -> list[Server]:
     servers: list[Server] = []
     for decl in cfg.servers:
         findings: list[Finding] = []
         findings += check_server_env(decl, cfg.path)
         findings += check_server_auto_approve(decl, cfg.path)
         findings += check_server_pinning(decl, cfg.path)
+        if osv_fetch is not None:
+            findings += _enrich_pinning(decl.name, decl.command, decl.args, cfg.path, osv_fetch)
         servers.append(
             Server(
                 id=f"{cfg.path}#{decl.name}",
@@ -72,6 +82,31 @@ def _audit_config(cfg: ParsedConfig) -> list[Server]:
             )
         )
     return servers
+
+
+def _enrich_pinning(
+    server_name: str,
+    command: str | None,
+    args: tuple[str, ...],
+    config_path: str,
+    osv_fetch: OsvFetch,
+) -> list[Finding]:
+    """Query OSV for a pinned package spec and emit a known-vuln finding if any."""
+    spec: PackageSpec | None = parse_package_spec(command, args)
+    if spec is None:
+        return []
+    vuln_ids, critical = osv_fetch(spec.name, spec.version, spec.ecosystem)
+    if not vuln_ids:
+        return []
+    return [known_vuln_finding(server_name, spec, vuln_ids, config_path, critical=critical)]
+
+
+def _default_osv_fetch(name: str, version: str, ecosystem: str) -> tuple[tuple[str, ...], bool]:
+    """Real OSV lookup. Imported lazily so egress code never loads by default."""
+    from .enrichment.osv import query_osv
+
+    vulns = query_osv(name, version, ecosystem)
+    return tuple(v.id for v in vulns), any(v.critical for v in vulns)
 
 
 def _audit_env_file(env_file: EnvFile) -> Server:
@@ -122,6 +157,8 @@ def scan(
     system: str | None = None,
     env: Mapping[str, str] | None = None,
     enumerate_sockets: bool = True,
+    online: bool = False,
+    osv_fetch: OsvFetch | None = None,
 ) -> Report:
     """Run a full localhost scan and return a deterministic Report.
 
@@ -130,10 +167,18 @@ def scan(
         system: ``platform.system()`` override (for testing).
         env: Environment mapping override (for testing).
         enumerate_sockets: When False, skips psutil enumeration (used in tests).
+        online: When True, enriches pinned packages with OSV advisories. The
+            egress module is imported only on this path (NFR-SEC1).
+        osv_fetch: Inject a fetcher (tests); defaults to the real OSV lookup when
+            ``online`` is True.
     """
     system = system or platform.system()
     env = env if env is not None else os.environ
     roots = list(roots) if roots is not None else [Path.cwd()]
+
+    fetch: OsvFetch | None = None
+    if online:
+        fetch = osv_fetch if osv_fetch is not None else _default_osv_fetch
 
     adapter = ClaudeAdapter()
     servers: list[Server] = []
@@ -151,7 +196,7 @@ def scan(
         raw = _read_config_file(path)
         if raw is None:
             continue
-        servers.extend(_audit_config(adapter.parse(str(path), raw)))
+        servers.extend(_audit_config(adapter.parse(str(path), raw), fetch))
 
     for path in project_paths:
         if not path.exists():
@@ -163,7 +208,7 @@ def scan(
             mode = stat.S_IMODE(path.stat().st_mode)
             servers.append(_audit_env_file(parse_env_text(str(path), raw, mode=mode)))
         else:
-            servers.extend(_audit_config(adapter.parse(str(path), raw)))
+            servers.extend(_audit_config(adapter.parse(str(path), raw), fetch))
 
     # --- running-server discovery + exposure ---
     if enumerate_sockets:
@@ -182,10 +227,10 @@ def scan(
                     )
                 )
 
-    return _assemble_report(servers)
+    return _assemble_report(servers, online=online)
 
 
-def _assemble_report(servers: Sequence[Server]) -> Report:
+def _assemble_report(servers: Sequence[Server], *, online: bool = False) -> Report:
     all_findings = [f for s in servers for f in s.findings]
     server_grades = [grade_findings(s.findings) for s in servers]
     return Report(
@@ -193,5 +238,5 @@ def _assemble_report(servers: Sequence[Server]) -> Report:
         servers=tuple(servers),
         overall_grade=worst_grade(server_grades),
         dimension_grades=dimension_grades(all_findings),
-        generated_with_online=False,
+        generated_with_online=online,
     )

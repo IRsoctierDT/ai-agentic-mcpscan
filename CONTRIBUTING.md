@@ -1,0 +1,53 @@
+# Contributing to AI Agentic MCPscan
+
+Thanks for your interest! This project aims to be exemplary, reviewable security
+tooling, so contributions are held to a clear bar.
+
+## Quick start
+
+```bash
+git clone https://github.com/IRsoctierDT/ai-agentic-mcpscan.git
+cd ai-agentic-mcpscan
+python -m venv .venv && . .venv/bin/activate
+python -m pip install -e ".[dev]"
+```
+
+## Run the full gate before opening a PR
+
+```bash
+ruff check .            # lint
+ruff format --check .   # formatting
+mypy src                # types (strict)
+bandit -r src           # SAST
+pytest                  # tests
+```
+
+CI runs the same gate on macOS, Linux, and Windows across Python 3.11–3.13. All
+of it must be green.
+
+## Architecture & where things go
+
+- The design is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+  Read it first — the dependency direction (pure core, I/O at the edges) is
+  intentional.
+- **New host support** → add a `HostAdapter` in `src/mcpscan/adapters/`. The
+  engine and checks must not need to change.
+- **New check** → add a small, single-responsibility function in
+  `src/mcpscan/checks/`, plus a **clean/negative fixture** (an input that must
+  produce zero findings) alongside the positive test. False positives are
+  treated as bugs.
+- **Anything touching the network** belongs only in `src/mcpscan/enrichment/`
+  and must stay behind `--online`.
+
+## Non-negotiables (will block a PR)
+
+- No raw secret value may reach output, logs, or disk. Route secrets through
+  `redaction`.
+- No egress on a default (non-`--online`) run.
+- No writing to a user's config files (advise-only).
+- New logic ships with tests, including failure/edge cases.
+
+## Commit style
+
+Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`, `test:`) scoped where
+useful (e.g. `feat(checks): …`).

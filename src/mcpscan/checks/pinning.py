@@ -7,6 +7,7 @@ floating version is a silent supply-chain risk.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from ..adapters.base import ServerDecl
 from ..domain import Dimension, Finding, Location, Severity
@@ -15,9 +16,71 @@ _VERSIONED = re.compile(r"@\d|@latest|==|@[~^]?\d")
 _LATEST = re.compile(r"@latest\b")
 _FLOATING_RUNNERS = {"npx", "uvx", "pnpx", "bunx"}
 
+_NPM_RUNNERS = {"npx", "pnpx", "bunx"}
+_PYPI_RUNNERS = {"uvx", "pipx", "pip"}
+
 
 def _package_args(args: tuple[str, ...]) -> list[str]:
     return [a for a in args if not a.startswith("-")]
+
+
+@dataclass(frozen=True)
+class PackageSpec:
+    """A resolved, version-pinned package coordinate for OSV enrichment."""
+
+    ecosystem: str  # "npm" or "PyPI"
+    name: str
+    version: str
+
+
+def parse_package_spec(command: str | None, args: tuple[str, ...]) -> PackageSpec | None:
+    """Extract an ecosystem/name/version from a runner command + args.
+
+    Returns ``None`` unless a concrete version is present (so online enrichment
+    only ever sends a fully-pinned coordinate — review F3).
+    """
+    runner = (command or "").rsplit("/", 1)[-1]
+    if runner in _NPM_RUNNERS:
+        ecosystem = "npm"
+    elif runner in _PYPI_RUNNERS:
+        ecosystem = "PyPI"
+    else:
+        return None
+
+    for arg in _package_args(args):
+        if ecosystem == "npm" and "@" in arg.lstrip("@"):
+            name, _, version = arg.rpartition("@")
+            if name and version and version[0].isdigit():
+                return PackageSpec(ecosystem, name, version)
+        elif ecosystem == "PyPI" and "==" in arg:
+            name, _, version = arg.partition("==")
+            if name and version:
+                return PackageSpec(ecosystem, name, version)
+    return None
+
+
+def known_vuln_finding(
+    server_name: str,
+    spec: PackageSpec,
+    vuln_ids: tuple[str, ...],
+    config_path: str,
+    *,
+    critical: bool = False,
+) -> Finding:
+    """Build a finding for a pinned-but-known-vulnerable package (online)."""
+    ids = ", ".join(vuln_ids[:5])
+    return Finding(
+        id="PIN-KNOWN-VULN",
+        dimension=Dimension.PINNING,
+        severity=Severity.CRITICAL if critical else Severity.HIGH,
+        title=(
+            f"Server {server_name!r} pins {spec.name}@{spec.version}, which has "
+            f"known advisories ({ids})"
+        ),
+        location=Location(path=config_path),
+        remediation=(f"Upgrade {spec.name} to a version without the listed advisories."),
+        rationale="A known-vulnerable dependency exposes the host to documented exploits.",
+    )
 
 
 def check_server_pinning(server: ServerDecl, config_path: str) -> list[Finding]:
