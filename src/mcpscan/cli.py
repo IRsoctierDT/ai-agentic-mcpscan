@@ -1,17 +1,25 @@
 """Command-line entry point for AI Agentic MCPscan (``mcpscan``).
 
-Scaffold only. The ``scan`` behavior is implemented in the build sprints; this
-module exists so the console script is wired and installable from day one. It
-makes **no** network calls and writes **no** files — consistent with the spec's
-offline-by-default, stateless trust properties.
+Wires the scan engine to the renderers. Honors the spec's trust properties:
+offline by default, secrets redacted unless ``--show-secrets``, and the only
+file writes are the reports the user explicitly requests (``--json`` / ``--html``).
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
 
 from . import __version__
 from .domain import Report, Severity
+
+_THRESHOLDS = {
+    "critical": (Severity.CRITICAL,),
+    "high": (Severity.CRITICAL, Severity.HIGH),
+    "medium": (Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM),
+    "low": (Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW),
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,17 +36,38 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         default=None,
         choices=["scan"],
-        help="The action to run (only 'scan' is planned for the MVP).",
+        help="The action to run (only 'scan' is available in the MVP).",
+    )
+    parser.add_argument(
+        "--root",
+        action="append",
+        type=Path,
+        metavar="DIR",
+        help="Project root to scan for .mcp.json/.env (repeatable; default: cwd).",
+    )
+    parser.add_argument("--json", metavar="PATH", type=Path, help="Write a JSON report.")
+    parser.add_argument("--html", metavar="PATH", type=Path, help="Write an HTML report.")
+    parser.add_argument(
+        "--show-secrets",
+        action="store_true",
+        help="Reveal masked (first-2/last-2) secret values. Off by default.",
+    )
+    parser.add_argument(
+        "--absolute-paths",
+        action="store_true",
+        help="Show full paths instead of relativizing to ~ (off by default).",
+    )
+    parser.add_argument(
+        "--fail-on",
+        choices=tuple(_THRESHOLDS),
+        default="high",
+        help="Minimum severity that makes the command exit non-zero (default: high).",
     )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Entry point. Returns a process exit code.
-
-    Until the engine lands, this reports that the build is pending rather than
-    pretending to scan — failing closed instead of returning a false 'clean'.
-    """
+    """Entry point. Returns a process exit code."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -46,38 +75,43 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
-    # args.command == "scan"
+    # Imported lazily so the default/help path stays light and import-isolated.
     from .engine import scan
+    from .report import RenderOptions
+    from .report.html import render_html
+    from .report.json_report import render_json
+    from .report.terminal import render_terminal
+    from .report.writer import write_report
 
-    report = scan()
-    _print_summary(report)
-    # Exit non-zero if any finding is at/above the threshold (CI-friendly).
-    has_serious = any(
-        f.severity in (Severity.CRITICAL, Severity.HIGH) for s in report.servers for f in s.findings
+    if args.show_secrets:
+        print(
+            "warning: --show-secrets reveals masked secret values; keep the output private.",
+            file=sys.stderr,
+        )
+
+    report = scan(roots=args.root)
+    opts = RenderOptions(
+        show_secrets=args.show_secrets,
+        absolute_paths=args.absolute_paths,
+        home=str(Path.home()),
     )
-    return 1 if has_serious else 0
+
+    print(render_terminal(report, opts), end="")
+    if args.json is not None:
+        write_report(args.json, render_json(report, opts))
+        print(f"wrote JSON report: {args.json}", file=sys.stderr)
+    if args.html is not None:
+        write_report(args.html, render_html(report, opts))
+        print(f"wrote HTML report: {args.html}", file=sys.stderr)
+
+    return _exit_code(report, args.fail_on)
 
 
-def _print_summary(report: Report) -> None:
-    """Concise terminal summary. Rich terminal/HTML/JSON renderers land in Sprint 3."""
-    print(f"AI Agentic MCPscan — overall posture: {report.overall_grade}")
-    findings = [(s, f) for s in report.servers for f in s.findings]
-    if not findings:
-        print("No findings. (Note: rich reporting arrives in Sprint 3.)")
-        return
-    order = {
-        Severity.CRITICAL: 0,
-        Severity.HIGH: 1,
-        Severity.MEDIUM: 2,
-        Severity.LOW: 3,
-        Severity.INFO: 4,
-    }
-    for server, finding in sorted(findings, key=lambda sf: order[sf[1].severity]):
-        loc = finding.location.path
-        if finding.location.line is not None:
-            loc = f"{loc}:{finding.location.line}"
-        print(f"  [{finding.severity.value.upper():8}] {finding.title}  ({loc})")
-        print(f"             fix: {finding.remediation}")
+def _exit_code(report: Report, fail_on: str) -> int:
+    """Non-zero if any finding is at/above the configured threshold."""
+    blocking = _THRESHOLDS[fail_on]
+    has_blocking = any(f.severity in blocking for s in report.servers for f in s.findings)
+    return 1 if has_blocking else 0
 
 
 if __name__ == "__main__":  # pragma: no cover
