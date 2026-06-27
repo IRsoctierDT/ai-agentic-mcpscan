@@ -86,6 +86,14 @@ def test_display_path_relativizes_home() -> None:
     assert display_path("/etc/other", opts) == "/etc/other"
 
 
+def test_display_path_is_separator_agnostic() -> None:
+    # Must work regardless of the OS rendering the report (Windows CI etc.).
+    win = RenderOptions(home="C:\\Users\\jane")
+    assert display_path("C:\\Users\\jane\\.mcp.json", win) == "~\\.mcp.json"
+    posix = RenderOptions(home="/home/jane")
+    assert display_path("/home/jane/.mcp.json", posix) == "~/.mcp.json"
+
+
 def test_absolute_paths_opt_out() -> None:
     opts = RenderOptions(home="/home/jane", absolute_paths=True)
     assert display_path("/home/jane/.mcp.json", opts) == "/home/jane/.mcp.json"

@@ -8,9 +8,10 @@ fingerprinted before a Report exists (R1), so no renderer can leak a raw value.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from os import sep
 
 from ..domain import Severity
+
+_SEPARATORS = ("/", "\\")
 
 SEVERITY_ORDER: dict[Severity, int] = {
     Severity.CRITICAL: 0,
@@ -38,9 +39,11 @@ def display_path(path: str, opts: RenderOptions) -> str:
     """
     if opts.absolute_paths or not opts.home:
         return path
-    home = opts.home.rstrip(sep)
+    # Separator-agnostic so it works regardless of the OS the report is rendered
+    # on (Windows CI rendering POSIX-style paths, and vice versa).
+    home = opts.home.rstrip("/\\")
     if path == home:
         return "~"
-    if path.startswith(home + sep):
+    if any(path.startswith(home + s) for s in _SEPARATORS):
         return "~" + path[len(home) :]
     return path
