@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ai-agentic-mcpscan"
-version = "0.0.0"
+version = "0.1.0"
 description = "Local-first, offline-by-default security posture scanner for MCP / local-agent setups."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "IRsoctierDT" }]
 keywords = ["mcp", "security", "scanner", "posture", "agent", "llm"]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
@@ -39,6 +39,7 @@ dev = [
     "types-psutil",
     "bandit",
     "pip-audit",
+    "build",
 ]
 
 [project.urls]
