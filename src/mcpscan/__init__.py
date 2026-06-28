@@ -5,4 +5,11 @@ engine is built across Sprints 1-4 per ``docs/BACKLOG.md`` after Principal
 Architect validation and full-team backlog review.
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    # Single source of truth: the version declared in pyproject.toml, surfaced
+    # through the installed package metadata (hatchling reads it from there).
+    __version__ = version("ai-agentic-mcpscan")
+except PackageNotFoundError:  # pragma: no cover - source tree without an install
+    __version__ = "0.0.0+unknown"

@@ -21,9 +21,10 @@ API token is ever stored in the repo. The `Release` workflow
 ## Each release
 
 1. Ensure `main` is green (CI passes on all OS / Python versions).
-2. Bump the version in **both** `pyproject.toml` and
-   `src/mcpscan/__init__.py` (keep them in sync — the release workflow fails if
-   the tag doesn't match `pyproject.toml`).
+2. Bump the version in `pyproject.toml` (`[project].version`) — the single
+   source of truth. `mcpscan.__version__` is derived from it via the installed
+   package metadata, so there is nothing else to keep in sync. The release
+   workflow fails if the git tag doesn't match this field.
 3. Commit the bump and push to `main`.
 4. Tag and create the release:
    ```bash
