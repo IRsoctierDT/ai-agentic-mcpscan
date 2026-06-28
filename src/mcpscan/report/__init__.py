@@ -11,8 +11,6 @@ from dataclasses import dataclass
 
 from ..domain import Severity
 
-_SEPARATORS = ("/", "\\")
-
 SEVERITY_ORDER: dict[Severity, int] = {
     Severity.CRITICAL: 0,
     Severity.HIGH: 1,
@@ -36,14 +34,19 @@ def display_path(path: str, opts: RenderOptions) -> str:
 
     Non-path locations (e.g. ``ip:port``) and paths outside home are returned
     unchanged. ``--absolute-paths`` disables relativization.
+
+    The separator is inferred from ``opts.home`` itself rather than ``os.sep``
+    so that POSIX-style paths are handled correctly even when the tool runs on
+    Windows (e.g. in tests that pass explicit ``/home/user`` strings).
     """
     if opts.absolute_paths or not opts.home:
         return path
-    # Separator-agnostic so it works regardless of the OS the report is rendered
-    # on (Windows CI rendering POSIX-style paths, and vice versa).
-    home = opts.home.rstrip("/\\")
+    # Infer separator from the home string, not os.sep, so POSIX-style paths
+    # round-trip correctly on Windows.
+    sep = "/" if "/" in opts.home else "\\"
+    home = opts.home.rstrip(sep)
     if path == home:
         return "~"
-    if any(path.startswith(home + s) for s in _SEPARATORS):
-        return "~" + path[len(home) :]
+    if path.startswith(home + sep):
+        return "~" + path[len(home):]
     return path
