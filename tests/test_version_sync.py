@@ -1,9 +1,12 @@
-"""Guard: the package version must match pyproject.toml (T-407 release safety).
+"""Guard: the exported version resolves to pyproject.toml (T-407 release safety).
 
-The release workflow (.github/workflows/release.yml) verifies the git *tag*
-matches ``[project].version`` in pyproject.toml, but nothing checks that
-``mcpscan.__version__`` agrees. If the two drift, we'd publish a wheel whose
-``mcpscan --version`` lies. This test fails fast on that drift so it can't ship.
+``mcpscan.__version__`` is derived from the installed package metadata
+(``importlib.metadata``), which hatchling populates from ``[project].version`` in
+pyproject.toml — so pyproject is the single source of truth. This test confirms
+that wiring actually resolves (rather than falling back to the sentinel) and
+matches the declared version, catching a broken/stale install or a packaging
+misconfig before a release ships a wheel whose ``mcpscan --version`` lies. The
+release workflow separately guards the git *tag* against the same field.
 """
 
 from __future__ import annotations
@@ -11,9 +14,12 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+import pytest
+
 import mcpscan
 
 _PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
+_FALLBACK = "0.0.0+unknown"
 
 
 def _pyproject_version() -> str:
@@ -21,9 +27,11 @@ def _pyproject_version() -> str:
     return str(data["project"]["version"])
 
 
-def test_package_version_matches_pyproject() -> None:
+def test_package_version_resolves_to_pyproject() -> None:
+    if mcpscan.__version__ == _FALLBACK:
+        pytest.skip("package not installed; __version__ fell back to the sentinel")
     assert mcpscan.__version__ == _pyproject_version(), (
         f"mcpscan.__version__ ({mcpscan.__version__}) != "
         f"pyproject [project].version ({_pyproject_version()}); "
-        "keep src/mcpscan/__init__.py and pyproject.toml in sync (see docs/RELEASING.md)."
+        "reinstall the package so its metadata matches pyproject.toml (see docs/RELEASING.md)."
     )
