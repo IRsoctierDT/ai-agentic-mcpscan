@@ -13,6 +13,7 @@ defined in [`BACKLOG.md`](./BACKLOG.md); requirements in [`SPEC.md`](./SPEC.md).
 |---|---|
 | ✅ `done` | Implemented and backed by code + tests in this repo |
 | 📄 `done_doc` | Required artifact/sign-off exists in the repo, but final acceptance is a human/process step |
+| 🟡 `partial` | Repo-verifiable portion done + tested; part of the acceptance needs an external environment |
 | ⏳ `pending` | Not yet completed |
 | ❓ `unverified` | Acceptance needs an environment we can't inspect from the repo |
 
@@ -23,7 +24,7 @@ defined in [`BACKLOG.md`](./BACKLOG.md); requirements in [`SPEC.md`](./SPEC.md).
 | 1 | Foundations & data model | ✅ done |
 | 2 | Core engine: discovery, audit, scoring | ✅ done |
 | 3 | Reporting & remediation | ✅ done |
-| 4 | Online enrichment, integration & hardening | 🔄 in progress (T-402 ❓, T-407 ⏳) |
+| 4 | Online enrichment, integration & hardening | 🔄 in progress (T-402 🟡, T-407 ⏳) |
 
 ## Sprint 1 — Foundations & data model
 
@@ -76,7 +77,7 @@ defined in [`BACKLOG.md`](./BACKLOG.md); requirements in [`SPEC.md`](./SPEC.md).
 | Ticket | Title | Owner | Status | Evidence |
 |---|---|---|---|---|
 | T-401 | `--online` OSV/PyPI enrichment | IE | ✅ | `enrichment/osv.py`, `engine.py`, `tests/test_enrichment.py` |
-| T-402 | End-to-end dogfood on real lab | IE/QA | ❓ | — (needs real MCP + pfSense/Suricata lab) |
+| T-402 | End-to-end dogfood on real lab | IE/QA | 🟡 | `tests/test_e2e_dogfood.py` (full-pipeline + live probe/enumeration; physical lab still manual) |
 | T-403 | Self-scan (NFR-SEC4) | SEC | ✅ | `tests/test_self_scan.py` |
 | T-404 | Cross-platform verification + coverage gate | QA | ✅ | `ci.yml` (3-OS × 3-Py matrix), `pyproject.toml` (`fail_under=90`) |
 | T-405 | Security Reviewer sign-off | SEC | 📄 | `docs/SECURITY_SIGNOFF.md` |
