@@ -1,20 +1,15 @@
-"""CLI wiring tests (help, scan summary, exit codes)."""
+"""CLI wiring tests (help, scan summary, exit codes, report writing, warnings)."""
 
 from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
 import mcpscan.engine as engine_mod
 from mcpscan.cli import main
-from mcpscan.domain import (
-    Dimension,
-    Finding,
-    Location,
-    Report,
-    Server,
-    ServerState,
-    Severity,
-)
+from mcpscan.domain import Finding, Report, Severity
 
 
 def test_no_command_prints_help_and_succeeds(capsys: pytest.CaptureFixture[str]) -> None:
@@ -23,43 +18,72 @@ def test_no_command_prints_help_and_succeeds(capsys: pytest.CaptureFixture[str])
     assert "mcpscan" in capsys.readouterr().out
 
 
-def _report(*findings: Finding) -> Report:
-    server = Server(
-        id="s",
-        bind_addr=None,
-        port=None,
-        pid=None,
-        proc_name=None,
-        state=ServerState.DECLARED,
-        running=False,
-        findings=tuple(findings),
-    )
-    return Report(
-        schema_version="1.0",
-        servers=(server,),
-        overall_grade="F" if findings else "A",
-        dimension_grades={},
-    )
-
-
 def test_scan_clean_returns_zero(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    make_report: Callable[..., Report],
 ) -> None:
-    monkeypatch.setattr(engine_mod, "scan", lambda **_: _report())
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: make_report())
     rc = main(["scan"])
     assert rc == 0
     assert "posture: A" in capsys.readouterr().out
 
 
-def test_scan_with_critical_returns_nonzero(monkeypatch: pytest.MonkeyPatch) -> None:
-    finding = Finding(
-        id="X",
-        dimension=Dimension.CREDENTIAL,
-        severity=Severity.CRITICAL,
-        title="t",
-        location=Location(path="p"),
-        remediation="fix",
-        rationale="r",
-    )
-    monkeypatch.setattr(engine_mod, "scan", lambda **_: _report(finding))
+def test_scan_with_critical_returns_nonzero(
+    monkeypatch: pytest.MonkeyPatch,
+    make_report: Callable[..., Report],
+    make_finding: Callable[..., Finding],
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: make_report(make_finding()))
     assert main(["scan"]) == 1
+
+
+def test_fail_on_threshold_respected(
+    monkeypatch: pytest.MonkeyPatch,
+    make_report: Callable[..., Report],
+    make_finding: Callable[..., Finding],
+) -> None:
+    # A MEDIUM finding is non-blocking at the default 'high' threshold but
+    # blocking when --fail-on is lowered to 'medium'.
+    medium = make_finding(id="M", severity=Severity.MEDIUM)
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: make_report(medium))
+    assert main(["scan"]) == 0
+    assert main(["scan", "--fail-on", "medium"]) == 1
+
+
+def test_writes_json_and_html_reports(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    make_report: Callable[..., Report],
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: make_report())
+    json_path = tmp_path / "report.json"
+    html_path = tmp_path / "report.html"
+    rc = main(["scan", "--json", str(json_path), "--html", str(html_path)])
+    assert rc == 0
+    assert json_path.exists() and json_path.read_text(encoding="utf-8").strip()
+    assert html_path.exists() and "<html" in html_path.read_text(encoding="utf-8").lower()
+    err = capsys.readouterr().err
+    assert "wrote JSON report" in err
+    assert "wrote HTML report" in err
+
+
+def test_show_secrets_emits_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    make_report: Callable[..., Report],
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: make_report())
+    main(["scan", "--show-secrets"])
+    assert "--show-secrets" in capsys.readouterr().err
+
+
+def test_online_emits_note(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    make_report: Callable[..., Report],
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: make_report())
+    main(["scan", "--online"])
+    assert "api.osv.dev" in capsys.readouterr().err

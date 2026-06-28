@@ -29,6 +29,18 @@ def test_windows_paths() -> None:
     assert any("Claude" in str(p) and "claude_desktop_config.json" in str(p) for p in cands)
 
 
+def test_windows_homedrive_homepath_fallback() -> None:
+    # No USERPROFILE -> fall back to HOMEDRIVE + HOMEPATH for the user home.
+    env = {"HOMEDRIVE": "C:", "HOMEPATH": r"\Users\jane"}
+    paths = [str(p) for p in claude_config_candidates("Windows", env)]
+    assert any(r"C:\Users\jane" in p and "settings.json" in p for p in paths)
+
+
+def test_windows_missing_home_yields_no_user_paths() -> None:
+    # Fail closed on Windows too: no USERPROFILE/HOMEDRIVE -> no user candidates.
+    assert claude_config_candidates("Windows", {}) == []
+
+
 def test_missing_home_yields_no_user_paths() -> None:
     # Fail closed: no HOME -> no user-level candidates, never a crash.
     assert claude_config_candidates("Linux", {}) == []
