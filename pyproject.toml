@@ -34,6 +34,7 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-cov",
+    "pyyaml",          # dev-only: parses docs/STATUS.yaml in the status-sync test
     "ruff",
     "mypy",
     "types-psutil",
@@ -65,3 +66,12 @@ strict = true
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "--strict-markers"
+
+[tool.coverage.run]
+source = ["mcpscan"]
+
+[tool.coverage.report]
+# Floor below the current ~98% so coverage can't silently regress, with headroom
+# for OS-specific branches that only execute on one leg of the CI matrix.
+fail_under = 90
+show_missing = true

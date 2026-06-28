@@ -5,7 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+import mcpscan.engine as engine_mod
 from mcpscan.adapters.claude import ClaudeAdapter
+from mcpscan.discovery.sockets import EnumerationResult, ListeningSocket
+from mcpscan.domain import Dimension, ServerState
 from mcpscan.engine import scan
 
 VULN_CONFIG = {
@@ -74,3 +79,67 @@ def test_scan_is_deterministic(tmp_path: Path) -> None:
     a = _scan_root(tmp_path, VULN_CONFIG)
     b = _scan_root(tmp_path, VULN_CONFIG)
     assert a == b
+
+
+# --- orchestration wiring the pure-check tests bypass ---
+def test_running_socket_exposure_lands_in_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An exposed listening socket becomes a RUNNING server with an exposure finding.
+    monkeypatch.setattr(
+        engine_mod,
+        "enumerate_listening",
+        lambda: EnumerationResult(
+            sockets=(ListeningSocket("0.0.0.0", 8000, 100, "node"),),  # noqa: S104
+            inspection_incomplete=False,
+        ),
+    )
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=True)
+    running = [s for s in report.servers if s.running]
+    assert len(running) == 1
+    assert running[0].bind_addr == "0.0.0.0"  # noqa: S104
+    assert running[0].state is ServerState.RUNNING
+    assert any(f.dimension is Dimension.EXPOSURE for f in running[0].findings)
+
+
+def test_loopback_socket_is_not_surfaced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A loopback bind has no exposure, so it must not appear as a server.
+    monkeypatch.setattr(
+        engine_mod,
+        "enumerate_listening",
+        lambda: EnumerationResult(
+            sockets=(ListeningSocket("127.0.0.1", 8000, 100, "node"),),
+            inspection_incomplete=False,
+        ),
+    )
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=True)
+    assert [s for s in report.servers if s.running] == []
+
+
+def test_user_level_config_is_discovered(tmp_path: Path) -> None:
+    # Drive the OS-default config discovery loop via system/env overrides.
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "settings.json").write_text(json.dumps(VULN_CONFIG), encoding="utf-8")
+    report = scan(roots=[], system="Darwin", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
+    ids = {f.id for s in report.servers for f in s.findings}
+    assert "CRED-PLAINTEXT" in ids
+
+
+def test_env_file_in_project_root_is_audited(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(
+        "OPENAI_API_KEY=sk-ABCDEFGHIJKLMNOPQRSTUVWX0123\n", encoding="utf-8"
+    )
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
+    env_servers = [s for s in report.servers if s.id.endswith(".env")]
+    assert len(env_servers) == 1
+    assert any(f.id == "CRED-PLAINTEXT" for f in env_servers[0].findings)
+
+
+def test_unreadable_config_is_skipped(tmp_path: Path) -> None:
+    # A path that exists but can't be safely read (here: a directory named
+    # like a config) is skipped gracefully rather than crashing the scan.
+    (tmp_path / ".mcp.json").mkdir()
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
+    assert report.servers == ()
+    assert report.overall_grade == "A"
