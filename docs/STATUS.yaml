@@ -8,6 +8,8 @@
 #   done_doc   - the required artifact/sign-off exists in the repo, but final
 #                acceptance is a human/process step (we can confirm the artifact,
 #                not that the external action was performed)
+#   partial    - the repo-verifiable portion is done + tested, but part of the
+#                acceptance needs an external environment we can't inspect here
 #   pending    - not yet completed
 #   unverified - acceptance needs an environment we can't inspect from the repo
 #                (e.g. a real lab run, a published PyPI release)
@@ -22,7 +24,7 @@ meta:
   source_of_truth: docs/STATUS.yaml
   view: docs/STATUS.md
   test_coverage: "98% line (gate: fail_under=90 in pyproject.toml)"
-  status_values: [done, done_doc, pending, unverified]
+  status_values: [done, done_doc, partial, pending, unverified]
 
 sprints:
   - id: 1
@@ -181,11 +183,15 @@ sprints:
       - id: T-402
         title: End-to-end dogfood on real lab
         owner: IE/QA
-        status: unverified
-        evidence: []
+        status: partial
+        evidence: [tests/test_e2e_dogfood.py]
         note: >-
-          Requires a real MCP setup + pfSense/Suricata lab. No artifact in the
-          repo confirms this run; cannot be verified from source.
+          Repo-verifiable half done: an end-to-end test scans a realistic project
+          (multiple servers, permissions, secret-bearing .env) through the full
+          pipeline and exercises the live probe + real psutil enumeration against
+          a loopback server (no mocks). The external AC — a stakeholder's physical
+          MCP setups + pfSense/Suricata lab — still needs hardware and remains a
+          manual step.
       - id: T-403
         title: Self-scan (NFR-SEC4)
         owner: SEC

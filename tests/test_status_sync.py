@@ -18,6 +18,7 @@ _DOCS = Path(__file__).resolve().parent.parent / "docs"
 _STATUS_ICONS = {
     "done": "✅",
     "done_doc": "📄",
+    "partial": "🟡",
     "pending": "⏳",
     "unverified": "❓",
 }
