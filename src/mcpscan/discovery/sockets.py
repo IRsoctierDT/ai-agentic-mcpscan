@@ -62,11 +62,11 @@ def classify_exposure(ip: str) -> Severity | None:
     if _is_wildcard(ip):
         return Severity.CRITICAL
     try:
-        addr = ipaddress.ip_address(ip)
+        ipaddress.ip_address(ip)
     except ValueError:
         return Severity.HIGH  # unparseable bind addr — flag conservatively
-    if addr.is_loopback:
-        return None
+    # Parseable, non-loopback (guarded above), non-wildcard: reachable beyond
+    # the host.
     return Severity.CRITICAL
 
 
