@@ -65,3 +65,14 @@ strict = true
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "--strict-markers"
+
+# Coverage gate (T-404 / SPEC §14: "coverage gate met"). Branch-aware so a
+# half-tested condition can't pass as covered. Applied to every coverage run,
+# local and CI, from one source. Current: 98% line / 96% branch.
+[tool.coverage.run]
+branch = true
+source = ["mcpscan"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90

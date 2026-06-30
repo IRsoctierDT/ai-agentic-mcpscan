@@ -6,9 +6,11 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 
 from mcpscan.checks.pinning import PackageSpec, parse_package_spec
-from mcpscan.enrichment.osv import OsvVuln, parse_osv_response
+from mcpscan.enrichment import osv as osv_mod
+from mcpscan.enrichment.osv import OsvVuln, parse_osv_response, query_osv
 from mcpscan.engine import scan
 
 PINNED_CONFIG = {
@@ -48,6 +50,49 @@ def test_parse_osv_response() -> None:
 def test_parse_osv_empty() -> None:
     assert parse_osv_response({}) == []
     assert parse_osv_response("nonsense") == []
+
+
+def test_parse_osv_skips_non_dict_entries() -> None:
+    # A malformed (non-dict) entry in the vulns list is skipped, not fatal.
+    data = {"vulns": ["not-a-dict", {"id": "CVE-9"}]}
+    assert [v.id for v in parse_osv_response(data)] == ["CVE-9"]
+
+
+def test_is_critical_via_cvss_9x_vector() -> None:
+    # No explicit "CRITICAL" label, but a 9.x CVSS vector -> treated as critical.
+    data = {
+        "vulns": [{"id": "CVE-X", "severity": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H 9.8"}]
+    }
+    assert parse_osv_response(data)[0].critical is True
+
+
+# --- query_osv egress: exercised via injected urlopen, never the live service ---
+class _FakeHttpResponse:
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def __enter__(self) -> _FakeHttpResponse:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def test_query_osv_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    body = json.dumps({"vulns": [{"id": "GHSA-net"}]}).encode("utf-8")
+    monkeypatch.setattr(osv_mod.urllib.request, "urlopen", lambda *a, **k: _FakeHttpResponse(body))
+    assert [v.id for v in query_osv("pkg", "1.0.0", "PyPI")] == ["GHSA-net"]
+
+
+def test_query_osv_is_failsafe_on_network_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(*_a: object, **_k: object) -> None:
+        raise OSError("network down")
+
+    monkeypatch.setattr(osv_mod.urllib.request, "urlopen", boom)
+    assert query_osv("pkg", "1.0.0", "PyPI") == []
 
 
 # --- engine integration via injected fetch (no real network) ---

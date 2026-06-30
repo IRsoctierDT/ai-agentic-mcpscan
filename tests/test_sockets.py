@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from mcpscan.discovery import sockets
+from mcpscan.domain import Severity
 
 
 class _Addr:
@@ -20,7 +21,12 @@ class _Addr:
         return True
 
 
-def _fake_psutil(connections: list[Any], *, raise_access: bool = False) -> types.ModuleType:
+def _fake_psutil(
+    connections: list[Any],
+    *,
+    raise_access: bool = False,
+    raise_proc_error: bool = False,
+) -> types.ModuleType:
     mod = types.ModuleType("psutil")
     mod.CONN_LISTEN = "LISTEN"  # type: ignore[attr-defined]
 
@@ -40,6 +46,8 @@ def _fake_psutil(connections: list[Any], *, raise_access: bool = False) -> types
             self._pid = pid
 
         def name(self) -> str:
+            if raise_proc_error:
+                raise Error()
             return f"proc{self._pid}"
 
     mod.AccessDenied = AccessDenied  # type: ignore[attr-defined]
@@ -76,3 +84,24 @@ def test_access_denied_degrades_gracefully(monkeypatch: pytest.MonkeyPatch) -> N
     result = sockets.enumerate_listening()
     assert result.sockets == ()
     assert result.inspection_incomplete is True
+
+
+def test_per_process_error_keeps_socket_but_flags_incomplete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # FR-D1: if naming one process is denied, keep the socket, drop the name,
+    # and flag the scan incomplete — never raise.
+    fake = _fake_psutil([_conn("127.0.0.1", 8000)], raise_proc_error=True)
+    monkeypatch.setitem(sys.modules, "psutil", fake)
+    result = sockets.enumerate_listening()
+    assert len(result.sockets) == 1
+    assert result.sockets[0].proc_name is None
+    assert result.inspection_incomplete is True
+
+
+def test_classify_exposure_branches() -> None:
+    # Loopback -> no exposure; wildcard/routable -> CRITICAL; unparseable -> HIGH.
+    assert sockets.classify_exposure("127.0.0.1") is None
+    assert sockets.classify_exposure("0.0.0.0") is Severity.CRITICAL  # noqa: S104
+    assert sockets.classify_exposure("192.168.1.10") is Severity.CRITICAL
+    assert sockets.classify_exposure("not-an-ip") is Severity.HIGH

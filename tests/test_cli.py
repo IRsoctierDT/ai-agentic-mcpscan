@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 import mcpscan.engine as engine_mod
@@ -63,3 +66,39 @@ def test_scan_with_critical_returns_nonzero(monkeypatch: pytest.MonkeyPatch) -> 
     )
     monkeypatch.setattr(engine_mod, "scan", lambda **_: _report(finding))
     assert main(["scan"]) == 1
+
+
+def test_show_secrets_emits_warning(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: _report())
+    main(["scan", "--show-secrets"])
+    assert "show-secrets" in capsys.readouterr().err
+
+
+def test_online_emits_egress_note(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: _report())
+    main(["scan", "--online"])
+    assert "api.osv.dev" in capsys.readouterr().err
+
+
+def test_writes_json_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: _report())
+    out = tmp_path / "report.json"
+    main(["scan", "--json", str(out)])
+    assert isinstance(json.loads(out.read_text(encoding="utf-8")), dict)
+    assert "wrote JSON report" in capsys.readouterr().err
+
+
+def test_writes_html_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: _report())
+    out = tmp_path / "report.html"
+    main(["scan", "--html", str(out)])
+    assert "<html" in out.read_text(encoding="utf-8").lower()
+    assert "wrote HTML report" in capsys.readouterr().err
