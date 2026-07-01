@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """AI Agentic MCPscan — local-first MCP security posture scanner.
 
 This package currently contains only the CLI entry-point scaffold. The scanner

@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Stable JSON renderer (ticket T-302).
 
 Deterministic and byte-stable (sorted keys, no timestamps) so it can be diffed,

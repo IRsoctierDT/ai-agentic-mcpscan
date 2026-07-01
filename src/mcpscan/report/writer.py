@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Safe report writing (ticket T-305, FR-R6).
 
 The only place the tool writes to disk. Files are created with owner-only

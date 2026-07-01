@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Command-line entry point for AI Agentic MCPscan (``mcpscan``).
 
 Wires the scan engine to the renderers. Honors the spec's trust properties:

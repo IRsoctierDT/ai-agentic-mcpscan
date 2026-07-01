@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Listening-socket enumeration + exposure classification (T-201, T-202).
 
 Enumeration uses psutil (the only portable way to observe a process's bind

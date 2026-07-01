@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Version-pinning checks (ticket T-209).
 
 Flags MCP servers launched from unpinned package specs (npx/uvx/pip), where a

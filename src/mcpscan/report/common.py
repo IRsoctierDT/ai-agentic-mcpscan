@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Shared helpers for renderers: ordering, location, and secret display."""
 
 from __future__ import annotations

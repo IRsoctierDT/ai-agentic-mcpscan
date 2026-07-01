@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Pure domain model for AI Agentic MCPscan (ticket T-102).
 
 These types are the shared vocabulary of the whole tool. They are **frozen** and

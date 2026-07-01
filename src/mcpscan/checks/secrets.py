@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Credential-hygiene checks (T-206 detection, T-207 at-rest).
 
 Detects plaintext secrets in server ``env`` blocks and ``.env`` files (by known

@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Secret redaction (architecture R1; foundational slice of ticket T-206).
 
 The single place a raw secret value is turned into a share-safe

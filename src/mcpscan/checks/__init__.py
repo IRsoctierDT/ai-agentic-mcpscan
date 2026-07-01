@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Posture checks.
 
 Each check is a small, single-responsibility function (Code Quality watch-item

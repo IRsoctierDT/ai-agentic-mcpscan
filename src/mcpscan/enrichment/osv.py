@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """OSV.dev lookups for known-vulnerable package versions (ticket T-401).
 
 This is egress code. ``query_osv`` is the only function that opens a socket, and

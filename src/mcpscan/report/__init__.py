@@ -1,3 +1,5 @@
+# Copyright 2026 IRsoctierDT
+# SPDX-License-Identifier: Apache-2.0
 """Report renderers: terminal, JSON, and self-contained HTML.
 
 All renderers consume only the pure ``domain`` model. Secrets are already
