@@ -1,4 +1,4 @@
-# Copyright 2026 IRsoctierDT
+# Copyright 2026 Ivan Rozenblad
 # SPDX-License-Identifier: Apache-2.0
 """Credential-hygiene checks (T-206 detection, T-207 at-rest).
 

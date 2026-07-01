@@ -1,4 +1,4 @@
-# Copyright 2026 IRsoctierDT
+# Copyright 2026 Ivan Rozenblad
 # SPDX-License-Identifier: Apache-2.0
 """Bounded, traversal-safe file reading (ticket T-104).
 

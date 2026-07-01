@@ -1,4 +1,4 @@
-# Copyright 2026 IRsoctierDT
+# Copyright 2026 Ivan Rozenblad
 # SPDX-License-Identifier: Apache-2.0
 """Listening-socket enumeration + exposure classification (T-201, T-202).
 

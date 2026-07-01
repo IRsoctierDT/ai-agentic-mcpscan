@@ -1,4 +1,4 @@
-# Copyright 2026 IRsoctierDT
+# Copyright 2026 Ivan Rozenblad
 # SPDX-License-Identifier: Apache-2.0
 """Exposure check: bind-address reachability (ticket T-202).
 
