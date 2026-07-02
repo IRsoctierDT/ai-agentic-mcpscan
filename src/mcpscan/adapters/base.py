@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Host-adapter interface and parsed-config types (ticket T-205).
 
 The ``HostAdapter`` ABC is the pluggable seam (ADR-4): adding support for another

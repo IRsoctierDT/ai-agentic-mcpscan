@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Tool-scope / auto-approval checks (ticket T-208).
 
 Flags over-broad permission grants and auto-approved dangerous (shell/exec-class)

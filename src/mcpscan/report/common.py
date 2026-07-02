@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Shared helpers for renderers: ordering, location, and secret display."""
 
 from __future__ import annotations

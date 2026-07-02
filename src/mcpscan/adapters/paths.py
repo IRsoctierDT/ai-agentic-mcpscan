@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """OS-aware config-path resolution (ticket T-103).
 
 This is the *only* place in the codebase that branches on operating system

@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Exposure check: bind-address reachability (ticket T-202).
 
 Pure transform from an observed socket bind address to a finding.

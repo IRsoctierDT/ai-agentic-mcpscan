@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Deterministic posture scoring (ticket T-210, SPEC §6).
 
 Pure functions: identical findings always yield identical grades. Each server

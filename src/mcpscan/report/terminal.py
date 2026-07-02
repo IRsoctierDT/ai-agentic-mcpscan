@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Human-readable terminal renderer (ticket T-301)."""
 
 from __future__ import annotations
