@@ -309,6 +309,14 @@ predictable, not speculative): `services/`, `packages/`, `docker/`, `infra/`
 | `sbom.yml` | GitHub Release | attach CycloneDX SBOM + SHA-256 checksums |
 | `dependabot.yml` | schedule | pip + github-actions update PRs, weekly |
 
+> **CodeQL & dependency-review are GitHub Advanced Security features.** They are
+> **free on public repositories** but unavailable on a private personal repo, so
+> both jobs are guarded with `if: github.event.repository.visibility == 'public'`
+> — they **skip (neutral) while the repo is private and self-activate the moment
+> it goes public**, with no further edit. Until then, SAST is covered by
+> `bandit` and SCA by `pip-audit` (both in the security job, which works on
+> private repos).
+
 ---
 
 ## Phased rollout
