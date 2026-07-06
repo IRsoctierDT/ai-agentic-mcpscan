@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Self-contained HTML renderer (ticket T-303).
 
 Emits a single ``.html`` string with **inline** CSS and **no external resource

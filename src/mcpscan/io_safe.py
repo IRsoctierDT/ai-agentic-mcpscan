@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Bounded, traversal-safe file reading (ticket T-104).
 
 Every config file the tool reads goes through here so that malformed, oversized,

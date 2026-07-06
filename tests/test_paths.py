@@ -29,6 +29,18 @@ def test_windows_paths() -> None:
     assert any("Claude" in str(p) and "claude_desktop_config.json" in str(p) for p in cands)
 
 
+def test_windows_homedrive_homepath_fallback() -> None:
+    # No USERPROFILE -> fall back to HOMEDRIVE + HOMEPATH for the user home.
+    env = {"HOMEDRIVE": "C:", "HOMEPATH": r"\Users\jane"}
+    paths = [str(p) for p in claude_config_candidates("Windows", env)]
+    assert any(p.endswith(r"\Users\jane\.claude\settings.json") for p in paths)
+
+
+def test_windows_missing_home_yields_no_user_paths() -> None:
+    # Fail closed on Windows too: no USERPROFILE/HOMEDRIVE -> no user candidates.
+    assert claude_config_candidates("Windows", {}) == []
+
+
 def test_missing_home_yields_no_user_paths() -> None:
     # Fail closed: no HOME -> no user-level candidates, never a crash.
     assert claude_config_candidates("Linux", {}) == []
@@ -38,18 +50,6 @@ def test_project_candidates() -> None:
     root = Path("/proj")
     names = {p.name for p in project_config_candidates(root)}
     assert names == {".mcp.json", ".env"}
-
-
-def test_windows_homedrive_homepath_fallback() -> None:
-    # No USERPROFILE: fall back to legacy HOMEDRIVE + HOMEPATH.
-    env = {"HOMEDRIVE": "C:", "HOMEPATH": r"\Users\jane"}
-    paths = [str(p) for p in claude_config_candidates("Windows", env)]
-    assert any(p.endswith(r"\Users\jane\.claude\settings.json") for p in paths)
-
-
-def test_windows_no_home_vars_fails_closed() -> None:
-    # Neither USERPROFILE nor HOMEDRIVE/HOMEPATH -> no user candidates, no crash.
-    assert claude_config_candidates("Windows", {}) == []
 
 
 def test_windows_without_appdata_skips_desktop_config() -> None:

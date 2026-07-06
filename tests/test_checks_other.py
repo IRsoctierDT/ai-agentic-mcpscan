@@ -29,6 +29,16 @@ def test_wildcard_bind_is_critical() -> None:
     assert findings[0].dimension is Dimension.EXPOSURE
 
 
+def test_routable_bind_is_critical() -> None:
+    # A concrete, parseable, non-loopback address is reachable beyond the host.
+    assert classify_exposure("8.8.8.8") is Severity.CRITICAL
+
+
+def test_unparseable_bind_is_high() -> None:
+    # An address we cannot parse is flagged conservatively rather than ignored.
+    assert classify_exposure("not-an-ip") is Severity.HIGH
+
+
 # --- tool scope ---
 def test_dangerous_allow_is_high() -> None:
     findings = check_permissions(("Bash(*)",), "/cfg.json")

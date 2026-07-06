@@ -1,0 +1,228 @@
+# Sprint / ticket status tracker for AI Agentic MCPscan.
+#
+# Source of truth for delivery status. docs/STATUS.md is a human-readable view
+# of this file — keep them in sync when a ticket changes state.
+#
+# Status vocabulary:
+#   done       - implemented and backed by code + tests in THIS repo
+#   done_doc   - the required artifact/sign-off exists in the repo, but final
+#                acceptance is a human/process step (we can confirm the artifact,
+#                not that the external action was performed)
+#   partial    - the repo-verifiable portion is done + tested, but part of the
+#                acceptance needs an external environment we can't inspect here
+#   pending    - not yet completed
+#   unverified - acceptance needs an environment we can't inspect from the repo
+#                (e.g. a real lab run, a published PyPI release)
+#
+# `evidence` lists repo paths that substantiate the status. Tickets trace to
+# requirements in docs/SPEC.md; see docs/BACKLOG.md for full acceptance criteria.
+
+meta:
+  product: AI Agentic MCPscan
+  cli: mcpscan
+  updated: "2026-06-28"
+  source_of_truth: docs/STATUS.yaml
+  view: docs/STATUS.md
+  test_coverage: "98% line (gate: fail_under=90 in pyproject.toml)"
+  status_values: [done, done_doc, partial, pending, unverified]
+
+sprints:
+  - id: 1
+    name: Foundations & data model
+    status: done
+    tickets:
+      - id: T-101
+        title: Project scaffold & packaging
+        owner: REL/ARCH
+        status: done
+        evidence: [pyproject.toml, .github/workflows/ci.yml, LICENSE, src/mcpscan/cli.py]
+      - id: T-102
+        title: Core domain model
+        owner: DE
+        status: done
+        evidence: [src/mcpscan/domain.py, tests/test_domain.py]
+      - id: T-103
+        title: OS-aware path resolver
+        owner: DE
+        status: done
+        evidence: [src/mcpscan/adapters/paths.py, tests/test_paths.py]
+      - id: T-104
+        title: Safe file reader
+        owner: DE/SEC
+        status: done
+        evidence: [src/mcpscan/io_safe.py, tests/test_io_safe.py]
+
+  - id: 2
+    name: "Core engine: discovery, audit, scoring"
+    status: done
+    tickets:
+      - id: T-201
+        title: Socket/process enumeration
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/discovery/sockets.py, tests/test_sockets.py]
+        note: >-
+          Permission-degradation AC (inspection_incomplete) now directly tested
+          via test_proc_name_denied_marks_incomplete_but_keeps_socket.
+      - id: T-202
+        title: Exposure detection (0.0.0.0)
+        owner: BE/SEC
+        status: done
+        evidence:
+          [src/mcpscan/checks/exposure.py, src/mcpscan/discovery/sockets.py, tests/test_checks_other.py]
+      - id: T-203
+        title: MCP confirmation probe
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/discovery/probe.py, tests/test_probe.py]
+      - id: T-204
+        title: Declared-server discovery
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/engine.py, src/mcpscan/adapters/claude.py, tests/test_engine.py]
+      - id: T-205
+        title: Host adapter + Claude adapter
+        owner: BE/ARCH
+        status: done
+        evidence: [src/mcpscan/adapters/base.py, src/mcpscan/adapters/claude.py, tests/test_engine.py]
+        note: >-
+          Adapter seam (HostAdapter ABC) and Claude impl shipped and tested. The
+          AC's "stub adapter proves no core change" is satisfied by the ABC design
+          but is NOT exercised by a dedicated stub-adapter test.
+      - id: T-206
+        title: Secret detection + redaction core
+        owner: BE/SEC
+        status: done
+        evidence:
+          [src/mcpscan/checks/secrets.py, src/mcpscan/redaction.py, tests/test_checks_secrets.py, tests/test_redaction.py]
+      - id: T-207
+        title: Secret-at-rest checks
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/checks/secrets.py, tests/test_checks_secrets.py]
+      - id: T-208
+        title: Tool-scope / auto-approval checks
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/checks/tool_scope.py, tests/test_checks_other.py]
+      - id: T-209
+        title: Version-pinning checks
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/checks/pinning.py, tests/test_checks_other.py, tests/test_enrichment.py]
+      - id: T-210
+        title: Scoring engine
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/scoring.py, tests/test_checks_other.py]
+      - id: T-211
+        title: Code Quality pass (post-sprint)
+        owner: CQ
+        status: done
+        evidence: [.github/workflows/ci.yml, pyproject.toml, tests/conftest.py]
+        note: >-
+          Lint/type gates (ruff, mypy --strict) enforced in CI; test-fixture
+          dedup centralized in conftest.py.
+
+  - id: 3
+    name: Reporting & remediation
+    status: done
+    tickets:
+      - id: T-301
+        title: Terminal renderer
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/report/terminal.py, src/mcpscan/cli.py, tests/test_report.py, tests/test_cli.py]
+        note: "CLI exit-code-by-threshold (--fail-on) covered in test_cli.py."
+      - id: T-302
+        title: JSON renderer
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/report/json_report.py, tests/test_report.py]
+        note: "Byte-stable output asserted (test_json_is_deterministic)."
+      - id: T-303
+        title: Static HTML renderer
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/report/html.py, tests/test_report.py]
+      - id: T-304
+        title: Remediation content
+        owner: BE/SEC
+        status: done
+        evidence: [src/mcpscan/checks/secrets.py, src/mcpscan/checks/exposure.py, src/mcpscan/checks/tool_scope.py, src/mcpscan/checks/pinning.py]
+        note: >-
+          Each finding type carries a remediation + rationale string; exercised
+          indirectly via the check tests rather than a dedicated remediation test.
+      - id: T-305
+        title: "--show-secrets gating + output file perms"
+        owner: SEC/BE
+        status: done
+        evidence: [src/mcpscan/cli.py, src/mcpscan/report/writer.py, tests/test_report.py, tests/test_cli.py]
+      - id: T-306
+        title: Path privacy (relativize home)
+        owner: BE
+        status: done
+        evidence: [src/mcpscan/report/common.py, src/mcpscan/report/__init__.py, tests/test_report.py]
+      - id: T-212
+        title: "Test corpus: clean + golden fixtures"
+        owner: QA
+        status: done
+        evidence: [tests/test_engine.py, tests/test_checks_other.py, tests/test_checks_secrets.py, tests/test_report.py]
+        note: "ID is in the 2xx series (added via review F2) but scheduled in Sprint 3."
+
+  - id: 4
+    name: "Online enrichment, integration & hardening"
+    status: in_progress
+    tickets:
+      - id: T-401
+        title: "--online OSV/PyPI enrichment"
+        owner: IE
+        status: done
+        evidence: [src/mcpscan/enrichment/osv.py, src/mcpscan/engine.py, tests/test_enrichment.py]
+        note: "Offline-default isolation + injected-fetch online path both tested."
+      - id: T-402
+        title: End-to-end dogfood on real lab
+        owner: IE/QA
+        status: partial
+        evidence: [tests/test_e2e_dogfood.py]
+        note: >-
+          Repo-verifiable half done: an end-to-end test scans a realistic project
+          (multiple servers, permissions, secret-bearing .env) through the full
+          pipeline and exercises the live probe + real psutil enumeration against
+          a loopback server (no mocks). The external AC — a stakeholder's physical
+          MCP setups + pfSense/Suricata lab — still needs hardware and remains a
+          manual step.
+      - id: T-403
+        title: Self-scan (NFR-SEC4)
+        owner: SEC
+        status: done
+        evidence: [tests/test_self_scan.py]
+      - id: T-404
+        title: Cross-platform verification + coverage gate
+        owner: QA
+        status: done
+        evidence: [.github/workflows/ci.yml, pyproject.toml]
+        note: >-
+          3-OS x 3-Python CI matrix present; the "coverage gate met" portion of
+          the AC was satisfied by adding fail_under=90 (PR #1, this work).
+          Cross-platform "suite green" is confirmed per-run by CI, not statically.
+      - id: T-405
+        title: Security Reviewer sign-off
+        owner: SEC
+        status: done_doc
+        evidence: [docs/SECURITY_SIGNOFF.md]
+        note: "Sign-off document present; threat-model row verification is a human attestation."
+      - id: T-406
+        title: Docs, onboarding, issue/PR templates
+        owner: REL
+        status: done
+        evidence:
+          [README.md, CONTRIBUTING.md, SECURITY.md, .github/PULL_REQUEST_TEMPLATE.md, .github/ISSUE_TEMPLATE/bug_report.md, .github/ISSUE_TEMPLATE/feature_request.md]
+      - id: T-407
+        title: PyPI release
+        owner: REL
+        status: pending
+        evidence: [.github/workflows/release.yml, docs/RELEASING.md]
+        note: >-
+          Release workflow (OIDC publish) is wired and RELEASING.md is written,
+          but no published, human-approved release is confirmable from the repo.

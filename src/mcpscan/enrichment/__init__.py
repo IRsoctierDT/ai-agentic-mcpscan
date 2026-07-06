@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Online enrichment — the ONLY package that performs network egress.
 
 It is imported lazily by the engine **only** when ``--online`` is passed, so a

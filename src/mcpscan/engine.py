@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Scan pipeline: discover → audit → score → assemble Report (Sprint 2 wiring).
 
 Orchestrates the pure checks and the I/O edges into a single deterministic

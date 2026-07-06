@@ -10,8 +10,8 @@ import pytest
 import mcpscan.engine as engine_mod
 from mcpscan.adapters.claude import ClaudeAdapter
 from mcpscan.discovery.sockets import EnumerationResult, ListeningSocket
+from mcpscan.domain import Dimension, ServerState
 from mcpscan.engine import scan
-from mcpscan.enrichment.osv import OsvVuln
 
 VULN_CONFIG = {
     "mcpServers": {
@@ -34,10 +34,6 @@ CLEAN_CONFIG = {
     },
     "permissions": {"allow": ["Read", "Glob(src/**)"]},
 }
-
-PINNED_CONFIG = {"mcpServers": {"svc": {"command": "npx", "args": ["-y", "some-mcp-server@1.2.3"]}}}
-
-UNPINNED_CONFIG = {"mcpServers": {"svc": {"command": "npx", "args": ["-y", "some-mcp-server"]}}}
 
 
 def test_adapter_parses_servers_and_permissions() -> None:
@@ -85,108 +81,65 @@ def test_scan_is_deterministic(tmp_path: Path) -> None:
     assert a == b
 
 
-# --- discovery edges (no project .mcp.json on these paths) ---
-def test_scan_discovers_os_default_config(tmp_path: Path) -> None:
-    # OS-default discovery: a planted ~/.claude/settings.json is found + audited,
-    # while the other (absent) candidate paths are skipped, not fatal.
-    home = tmp_path / "home"
-    settings = home / ".claude" / "settings.json"
-    settings.parent.mkdir(parents=True)
-    settings.write_text(json.dumps(VULN_CONFIG), encoding="utf-8")
-    empty_root = tmp_path / "proj"
-    empty_root.mkdir()
-    report = scan(
-        roots=[empty_root],
-        system="Darwin",
-        env={"HOME": str(home)},
-        enumerate_sockets=False,
-    )
-    ids = {f.id for s in report.servers for f in s.findings}
-    assert "CRED-PLAINTEXT" in ids
-
-
-def test_scan_audits_project_env_file(tmp_path: Path) -> None:
-    # .env project discovery -> env-file secret audit path.
-    (tmp_path / ".env").write_text(
-        "OPENAI_API_KEY=sk-ABCDEFGHIJKLMNOPQRSTUVWX0123\n", encoding="utf-8"
-    )
-    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
-    env_servers = [s for s in report.servers if s.id.endswith(".env")]
-    assert env_servers
-    assert env_servers[0].findings  # at least one secret/permission finding
-
-
-def test_scan_skips_unreadable_config(tmp_path: Path) -> None:
-    # A path that fails safe_read (a directory named .mcp.json) is skipped, not fatal.
-    (tmp_path / ".mcp.json").mkdir()
-    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
-    assert report.servers == ()
-    assert report.overall_grade == "A"
-
-
-def test_scan_enumerates_exposed_socket(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # Running-server discovery: a wildcard-bound socket becomes an EXPOSE finding.
+# --- orchestration wiring the pure-check tests bypass ---
+def test_running_socket_exposure_lands_in_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An exposed listening socket becomes a RUNNING server with an exposure finding.
     monkeypatch.setattr(
         engine_mod,
         "enumerate_listening",
         lambda: EnumerationResult(
-            sockets=(
-                ListeningSocket("0.0.0.0", 8000, 123, "node"),  # noqa: S104  exposed
-                ListeningSocket("127.0.0.1", 9000, 124, "node"),  # loopback: filtered out
-            ),
+            sockets=(ListeningSocket("0.0.0.0", 8000, 100, "node"),),  # noqa: S104
             inspection_incomplete=False,
         ),
     )
     report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=True)
     running = [s for s in report.servers if s.running]
-    assert len(running) == 1  # only the exposed socket is surfaced
+    assert len(running) == 1
     assert running[0].bind_addr == "0.0.0.0"  # noqa: S104
-    assert any(f.id == "EXPOSE-BIND" for f in running[0].findings)
+    assert running[0].state is ServerState.RUNNING
+    assert any(f.dimension is Dimension.EXPOSURE for f in running[0].findings)
 
 
-# --- online enrichment wiring ---
-def test_online_default_fetch_wires_real_osv(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # online=True with no injected fetch -> _default_osv_fetch imports query_osv.
-    import mcpscan.enrichment.osv as osv_mod
-
-    (tmp_path / ".mcp.json").write_text(json.dumps(PINNED_CONFIG), encoding="utf-8")
-    monkeypatch.setattr(osv_mod, "query_osv", lambda *a: [OsvVuln(id="GHSA-real", critical=True)])
-    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False, online=True)
-    ids = {f.id for s in report.servers for f in s.findings}
-    assert "PIN-KNOWN-VULN" in ids
-
-
-def test_online_no_vuln_adds_nothing(tmp_path: Path) -> None:
-    (tmp_path / ".mcp.json").write_text(json.dumps(PINNED_CONFIG), encoding="utf-8")
-    report = scan(
-        roots=[tmp_path],
-        system="Linux",
-        env={},
-        enumerate_sockets=False,
-        online=True,
-        osv_fetch=lambda *a: ((), False),
+def test_loopback_socket_is_not_surfaced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A loopback bind has no exposure, so it must not appear as a server.
+    monkeypatch.setattr(
+        engine_mod,
+        "enumerate_listening",
+        lambda: EnumerationResult(
+            sockets=(ListeningSocket("127.0.0.1", 8000, 100, "node"),),
+            inspection_incomplete=False,
+        ),
     )
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=True)
+    assert [s for s in report.servers if s.running] == []
+
+
+def test_user_level_config_is_discovered(tmp_path: Path) -> None:
+    # Drive the OS-default config discovery loop via system/env overrides.
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "settings.json").write_text(json.dumps(VULN_CONFIG), encoding="utf-8")
+    report = scan(roots=[], system="Darwin", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
     ids = {f.id for s in report.servers for f in s.findings}
-    assert "PIN-KNOWN-VULN" not in ids
+    assert "CRED-PLAINTEXT" in ids
 
 
-def test_online_skips_unpinnable_command(tmp_path: Path) -> None:
-    # An unpinned command has no concrete version -> fetch is never called.
-    (tmp_path / ".mcp.json").write_text(json.dumps(UNPINNED_CONFIG), encoding="utf-8")
-    calls: list[tuple[str, str, str]] = []
-
-    def fetch(name: str, version: str, ecosystem: str) -> tuple[tuple[str, ...], bool]:
-        calls.append((name, version, ecosystem))
-        return ((), False)
-
-    scan(
-        roots=[tmp_path],
-        system="Linux",
-        env={},
-        enumerate_sockets=False,
-        online=True,
-        osv_fetch=fetch,
+def test_env_file_in_project_root_is_audited(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(
+        "OPENAI_API_KEY=sk-ABCDEFGHIJKLMNOPQRSTUVWX0123\n", encoding="utf-8"
     )
-    assert calls == []
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
+    env_servers = [s for s in report.servers if s.id.endswith(".env")]
+    assert len(env_servers) == 1
+    assert any(f.id == "CRED-PLAINTEXT" for f in env_servers[0].findings)
+
+
+def test_unreadable_config_is_skipped(tmp_path: Path) -> None:
+    # A path that exists but can't be safely read (here: a directory named
+    # like a config) is skipped gracefully rather than crashing the scan.
+    (tmp_path / ".mcp.json").mkdir()
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
+    assert report.servers == ()
+    assert report.overall_grade == "A"

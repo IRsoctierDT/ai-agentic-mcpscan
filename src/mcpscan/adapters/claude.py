@@ -1,3 +1,5 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
 """Claude-ecosystem host adapter (ticket T-205, first HostAdapter impl).
 
 Parses the ``mcpServers`` mapping and permission allow-lists from Claude Code

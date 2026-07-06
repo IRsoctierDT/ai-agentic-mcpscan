@@ -50,4 +50,18 @@ of it must be green.
 ## Commit style
 
 Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`, `test:`) scoped where
-useful (e.g. `feat(checks): …`).
+useful (e.g. `feat(checks): …`). PR titles are checked against this format by
+CI. To get a helpful template in your editor:
+
+```bash
+git config commit.template .gitmessage
+```
+
+## Workflow, branching & releases
+
+The full Git workflow, CI/CD pipeline, branch-protection settings, semantic
+versioning, rollback, and release process are documented in
+[`docs/DEVSECOPS.md`](docs/DEVSECOPS.md). In short: branch `feature/*` off
+`main`, keep it short-lived, open a PR, get CI green + one review, and squash-merge.
+
+Participation is governed by our [Code of Conduct](CODE_OF_CONDUCT.md).

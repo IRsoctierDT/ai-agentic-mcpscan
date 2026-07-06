@@ -9,8 +9,8 @@ description = "Local-first, offline-by-default security posture scanner for MCP 
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
-authors = [{ name = "IRsoctierDT" }]
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Ivan Rozenblad", email = "irozenblad@icloud.com" }]
 keywords = ["mcp", "security", "scanner", "posture", "agent", "llm"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -34,6 +34,7 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-cov",
+    "pyyaml",          # dev-only: parses docs/STATUS.yaml in the status-sync test
     "ruff",
     "mypy",
     "types-psutil",
@@ -68,11 +69,13 @@ addopts = "--strict-markers"
 
 # Coverage gate (T-404 / SPEC §14: "coverage gate met"). Branch-aware so a
 # half-tested condition can't pass as covered. Applied to every coverage run,
-# local and CI, from one source. Current: 98% line / 96% branch.
+# local and CI, from one source. Floor below the current ~98% so coverage can't
+# silently regress, with headroom for OS-specific branches that only execute on
+# one leg of the CI matrix.
 [tool.coverage.run]
 branch = true
 source = ["mcpscan"]
 
 [tool.coverage.report]
-show_missing = true
 fail_under = 90
+show_missing = true
