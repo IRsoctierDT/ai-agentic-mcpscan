@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Agentic MCPscan — security posture scanner for MCP & local agents</title>
+<meta name="description" content="Local-first, offline-by-default security posture scanner for MCP servers and local AI-agent setups. Finds exposed servers, plaintext secrets, over-broad tool permissions, and unpinned packages — in one command.">
+<style>
+  :root{
+    --bg:#ffffff; --fg:#1b1f24; --muted:#5b6470; --card:#f6f7f9; --border:#e5e8ec;
+    --accent:#6366f1; --accent-fg:#ffffff; --code-bg:#0d1117; --code-fg:#e6edf3;
+    --crit:#ff6b6b; --high:#ffa657; --med:#e3d34a; --ok:#5ad19a; --grade:#8b95ff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0b0d10; --fg:#e6edf3; --muted:#9aa4b2; --card:#14181d; --border:#232a31; }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent); text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:960px; margin:0 auto; padding:0 20px}
+  code,pre{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+
+  header.hero{padding:76px 0 40px; text-align:center}
+  .eyebrow{color:var(--accent); font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:13px}
+  h1{font-size:clamp(30px,6vw,52px); line-height:1.1; margin:14px 0 10px; letter-spacing:-.02em}
+  .tagline{font-size:clamp(17px,2.4vw,20px); color:var(--muted); max-width:620px; margin:0 auto 26px}
+  .install{
+    display:inline-flex; align-items:center; gap:10px; background:var(--code-bg); color:var(--code-fg);
+    padding:12px 16px; border-radius:10px; font:15px/1 ui-monospace,Menlo,Consolas,monospace; margin-bottom:22px;
+  }
+  .install .dollar{color:#7d8590}
+  .cta{display:flex; gap:12px; justify-content:center; flex-wrap:wrap}
+  .btn{display:inline-block; padding:11px 20px; border-radius:9px; font-weight:600; border:1px solid var(--border)}
+  .btn.primary{background:var(--accent); color:var(--accent-fg); border-color:var(--accent)}
+  .btn.primary:hover{text-decoration:none; filter:brightness(1.08)}
+  .btn.ghost:hover{text-decoration:none; border-color:var(--accent)}
+  .badges{margin-top:22px; color:var(--muted); font-size:14px}
+  .badges span{white-space:nowrap}
+  .badges .dot{opacity:.5; margin:0 8px}
+
+  section{padding:44px 0; border-top:1px solid var(--border)}
+  h2{font-size:clamp(22px,3.4vw,28px); margin:0 0 6px; letter-spacing:-.01em}
+  .sub{color:var(--muted); margin:0 0 26px}
+
+  .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:16px}
+  @media (max-width:640px){ .grid{grid-template-columns:1fr} }
+  .card{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px 20px}
+  .card h3{margin:0 0 6px; font-size:17px}
+  .card p{margin:0; color:var(--muted); font-size:15px}
+  .card .tag{font:12px/1 ui-monospace,monospace; color:var(--accent); font-weight:700; text-transform:uppercase; letter-spacing:.05em}
+
+  .terminal{background:var(--code-bg); border-radius:12px; border:1px solid #21262d; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,.18)}
+  .tbar{display:flex; gap:7px; padding:12px 14px; background:#161b22; border-bottom:1px solid #21262d}
+  .tbar i{width:12px; height:12px; border-radius:50%; display:inline-block}
+  .tbar .r{background:#ff5f56}.tbar .y{background:#ffbd2e}.tbar .g{background:#27c93f}
+  .terminal pre{margin:0; padding:18px 18px 22px; overflow-x:auto; color:var(--code-fg); font-size:13.5px; line-height:1.55}
+  .crit{color:var(--crit); font-weight:700}
+  .high{color:var(--high); font-weight:700}
+  .med{color:var(--med); font-weight:700}
+  .grade{color:var(--grade); font-weight:700}
+  .dim{color:#8b949e}
+  .fx{color:var(--ok)}
+
+  ul.props{list-style:none; padding:0; margin:0; display:grid; grid-template-columns:repeat(2,1fr); gap:14px 24px}
+  @media (max-width:640px){ ul.props{grid-template-columns:1fr} }
+  ul.props li{padding-left:26px; position:relative; color:var(--muted); font-size:15px}
+  ul.props li::before{content:"✓"; position:absolute; left:0; top:0; color:var(--ok); font-weight:800}
+  ul.props strong{color:var(--fg)}
+
+  footer{border-top:1px solid var(--border); padding:30px 0 50px; text-align:center; color:var(--muted); font-size:14px}
+  footer a{margin:0 8px}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">MCP &amp; local-agent security</div>
+    <h1>AI Agentic MCPscan</h1>
+    <p class="tagline">Find the security holes in your MCP and local-agent setup — before someone else does. Local-first, offline by default, one command.</p>
+    <div class="install"><span class="dollar">$</span> pipx install ai-agentic-mcpscan</div>
+    <div class="cta">
+      <a class="btn primary" href="https://pypi.org/project/ai-agentic-mcpscan/">Get it on PyPI</a>
+      <a class="btn ghost" href="https://github.com/IRsoctierDT/ai-agentic-mcpscan">View on GitHub</a>
+    </div>
+    <div class="badges">
+      <span>Apache-2.0</span><span class="dot">·</span><span>Python 3.11+</span><span class="dot">·</span><span>macOS / Linux / Windows</span><span class="dot">·</span><span>No telemetry</span>
+    </div>
+  </div>
+</header>
+
+<section id="checks">
+  <div class="wrap">
+    <h2>What it checks</h2>
+    <p class="sub">Four dimensions, graded A–F per server and overall.</p>
+    <div class="grid">
+      <div class="card"><div class="tag">Exposure</div><h3>Servers reachable beyond loopback</h3><p>Flags MCP servers bound to <code>0.0.0.0</code> or a routable address instead of <code>127.0.0.1</code>.</p></div>
+      <div class="card"><div class="tag">Credentials</div><h3>Plaintext secrets at rest</h3><p>Detects API keys and high-entropy secrets in configs and <code>.env</code> files, plus world-readable or git-tracked secret files.</p></div>
+      <div class="card"><div class="tag">Tool scope</div><h3>Over-broad permissions</h3><p>Catches auto-approved shell/exec tools and wildcard allow-lists that hand agents an RCE primitive.</p></div>
+      <div class="card"><div class="tag">Pinning</div><h3>Unpinned supply chain</h3><p>Surfaces floating <code>npx</code>/<code>uvx</code> packages that fetch new, unreviewed code on every run.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="wrap">
+    <h2>See it in one command</h2>
+    <p class="sub">A real scan of a misconfigured project — secrets, an exposed socket, an unpinned package, a blanket <code>Bash(*)</code> grant.</p>
+    <div class="terminal">
+      <div class="tbar"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+<pre><span class="dim">$</span> mcpscan scan
+
+AI Agentic MCPscan — overall posture: <span class="crit">F</span>
+  dimensions: credential=<span class="crit">F</span>, exposure=<span class="crit">F</span>, pinning=<span class="grade">B</span>, tool_scope=<span class="grade">B</span>
+  findings: 3 critical, 2 high, 1 medium
+
+▶ ~/project/.mcp.json#leaky-db  <span class="grade">[grade F]</span>
+  [<span class="crit">CRITICAL</span>] Plaintext high-entropy secret in config
+             secret: <span class="dim">[redacted len=28 sha256:961290af]</span>
+             <span class="fx">fix:</span>   Move it to a secret manager or runtime env var, and rotate it.
+  [<span class="med">MEDIUM</span>  ] Server 'leaky-db' runs an unpinned package via npx
+             <span class="fx">fix:</span>   Pin to an exact version, e.g. npx some-pkg@1.2.3.
+
+▶ ~/project/.env  <span class="grade">[grade F]</span>
+  [<span class="crit">CRITICAL</span>] Plaintext OpenAI API key in config  <span class="dim">(.env:1)</span>
+             <span class="fx">fix:</span>   Remove the literal value; rotate the exposed key.
+  [<span class="high">HIGH</span>    ] Secret file is group/world-readable
+             <span class="fx">fix:</span>   chmod 600 the file.
+
+▶ socket://0.0.0.0:8000  <span class="grade">[grade D]</span>
+  [<span class="crit">CRITICAL</span>] MCP server reachable beyond loopback (0.0.0.0:8000)
+             <span class="fx">fix:</span>   Bind to 127.0.0.1 instead of 0.0.0.0.
+</pre>
+    </div>
+  </div>
+</section>
+
+<section id="trust">
+  <div class="wrap">
+    <h2>Trusted by construction</h2>
+    <p class="sub">A security tool shouldn't widen your attack surface. This one is built not to.</p>
+    <ul class="props">
+      <li><strong>Offline by default.</strong> No network egress unless you pass <code>--online</code>.</li>
+      <li><strong>Loopback-only.</strong> Never probes beyond <code>127.0.0.1</code>; refuses non-loopback targets.</li>
+      <li><strong>Secrets redacted.</strong> Raw values are fingerprinted at detection — never printed or logged.</li>
+      <li><strong>Read-only.</strong> Writes nothing except the reports you ask for (<code>chmod 600</code>).</li>
+    </ul>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2>Quick start</h2>
+    <p class="sub">Install once, then scan. Grades and exit codes drop straight into CI.</p>
+    <div class="terminal">
+      <div class="tbar"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+<pre><span class="dim"># install</span>
+pipx install ai-agentic-mcpscan
+
+<span class="dim"># scan the current project + any running MCP servers</span>
+mcpscan scan
+
+<span class="dim"># machine-readable and shareable reports</span>
+mcpscan scan --json report.json
+mcpscan scan --html report.html
+
+<span class="dim"># fail CI on High-or-worse findings</span>
+mcpscan scan --fail-on high
+</pre>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a href="https://pypi.org/project/ai-agentic-mcpscan/">PyPI</a>·
+    <a href="https://github.com/IRsoctierDT/ai-agentic-mcpscan">GitHub</a>·
+    <a href="https://github.com/IRsoctierDT/ai-agentic-mcpscan/blob/main/LICENSE">Apache-2.0</a>
+    <div style="margin-top:10px">© 2026 Ivan Rozenblad</div>
+  </div>
+</footer>
+</body>
+</html>
