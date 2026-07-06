@@ -1,0 +1,27 @@
+# <type>(<optional scope>): <subject>        <- 50 chars, imperative, lowercase
+#
+# <body: what changed and WHY. Wrap at 72.>
+#
+# <footers: "Refs: #123", "BREAKING CHANGE: <desc>">
+#
+# ---------------------------------------------------------------------------
+# Conventional Commits (https://www.conventionalcommits.org)
+# Types:
+#   feat     – a new feature                 (→ minor release)
+#   fix      – a bug fix                      (→ patch release)
+#   perf     – a performance improvement      (→ patch release)
+#   security – a security fix/hardening       (→ patch release)
+#   docs     – documentation only
+#   test     – tests only
+#   refactor – neither fixes a bug nor adds a feature
+#   style    – formatting, no code change
+#   build    – build system / dependencies
+#   ci       – CI configuration
+#   chore    – other maintenance
+#   revert   – reverts a previous commit
+#
+# Breaking change: add "!" after the type/scope (feat!:) OR a
+# "BREAKING CHANGE:" footer  (→ major release).
+#
+# Enable this template once:  git config commit.template .gitmessage
+# ---------------------------------------------------------------------------

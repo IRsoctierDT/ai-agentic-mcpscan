@@ -1,0 +1,15 @@
+# Code owners — auto-requested as reviewers on matching paths.
+# Docs: https://docs.github.com/articles/about-code-owners
+
+# Default owner for everything.
+*                           @IRsoctierDT
+
+# Security-critical surfaces get explicit ownership.
+/src/mcpscan/redaction.py   @IRsoctierDT
+/src/mcpscan/enrichment/    @IRsoctierDT
+/src/mcpscan/discovery/     @IRsoctierDT
+
+# CI/CD, supply chain, and governance.
+/.github/                   @IRsoctierDT
+/SECURITY.md                @IRsoctierDT
+/pyproject.toml             @IRsoctierDT
