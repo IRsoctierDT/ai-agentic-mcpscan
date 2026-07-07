@@ -306,7 +306,7 @@ predictable, not speculative): `services/`, `packages/`, `docker/`, `infra/`
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | PR, push | lint, format, types, SAST, tests+coverage, build (3 OS × 3 Py) |
-| `codeql.yml` | PR, push, weekly | semantic security analysis (CodeQL) |
+| CodeQL (default setup) | GitHub-managed | semantic security analysis (python + actions); enabled in repo settings, not a workflow file |
 | `dependency-review.yml` | PR | block PRs that add vulnerable/incompatible deps |
 | `pr-title.yml` | PR | enforce Conventional Commit PR titles |
 | `release.yml` | GitHub Release | verify tag, build, Trusted-Publish to PyPI (manual path; used for v0.1.0) |
@@ -314,13 +314,18 @@ predictable, not speculative): `services/`, `packages/`, `docker/`, `infra/`
 | `sbom.yml` | GitHub Release | attach CycloneDX SBOM + SHA-256 checksums |
 | `dependabot.yml` | schedule | pip + github-actions update PRs, weekly |
 
-> **CodeQL & dependency-review are GitHub Advanced Security features.** They are
-> **free on public repositories** but unavailable on a private personal repo, so
-> both jobs are guarded with `if: github.event.repository.visibility == 'public'`
-> — they **skip (neutral) while the repo is private and self-activate the moment
-> it goes public**, with no further edit. Until then, SAST is covered by
-> `bandit` and SCA by `pip-audit` (both in the security job, which works on
-> private repos).
+> **CodeQL & dependency-review are GitHub Advanced Security features** — free on
+> **public** repos, unavailable on a private personal repo.
+> - **CodeQL** runs via GitHub's **default setup** (Settings → Code security),
+>   which is GitHub-managed and analyzes python + actions. Do **not** also commit
+>   an advanced `codeql.yml`: default + advanced conflict and the advanced run
+>   fails with a configuration error.
+> - **`dependency-review.yml`** is guarded with
+>   `if: github.event.repository.visibility == 'public'`, so it skips (neutral)
+>   while private and self-activates when the repo is public.
+>
+> On a private repo, SAST/SCA are still covered by `bandit` + `pip-audit` in the
+> security job.
 
 ---
 
@@ -353,7 +358,8 @@ the UI once:
 
 - [ ] Settings → Code security: enable **Secret scanning** + **Push protection**.
 - [ ] Settings → Code security: enable **Dependabot alerts** + **security updates**.
-- [ ] Settings → Code security: enable **CodeQL** (advanced setup is provided by `codeql.yml`).
+- [ ] Settings → Code security: enable **CodeQL default setup** (GitHub-managed;
+      do not also commit an advanced `codeql.yml` — they conflict).
 - [ ] Settings → Branches → add a **ruleset/branch protection** for `main` per Section 5.
 - [ ] Settings → Environments → create **`pypi`** with a **required reviewer** (you).
 - [ ] PyPI → add a second **Trusted Publisher** for workflow **`release-please.yml`**
