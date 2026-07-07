@@ -13,6 +13,7 @@ from typing import Any, Callable
 import pytest
 
 from mcpscan.discovery import sockets
+from mcpscan.domain import Severity
 
 
 def test_enumerates_listening_socket(
@@ -64,3 +65,11 @@ def test_proc_name_denied_marks_incomplete_but_keeps_socket(
     assert len(result.sockets) == 1
     assert result.sockets[0].proc_name is None
     assert result.inspection_incomplete is True
+
+
+def test_classify_exposure_branches() -> None:
+    # Loopback -> no exposure; wildcard/routable -> CRITICAL; unparseable -> HIGH.
+    assert sockets.classify_exposure("127.0.0.1") is None
+    assert sockets.classify_exposure("0.0.0.0") is Severity.CRITICAL  # noqa: S104
+    assert sockets.classify_exposure("192.168.1.10") is Severity.CRITICAL
+    assert sockets.classify_exposure("not-an-ip") is Severity.HIGH

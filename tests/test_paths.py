@@ -33,7 +33,7 @@ def test_windows_homedrive_homepath_fallback() -> None:
     # No USERPROFILE -> fall back to HOMEDRIVE + HOMEPATH for the user home.
     env = {"HOMEDRIVE": "C:", "HOMEPATH": r"\Users\jane"}
     paths = [str(p) for p in claude_config_candidates("Windows", env)]
-    assert any(r"C:\Users\jane" in p and "settings.json" in p for p in paths)
+    assert any(p.endswith(r"\Users\jane\.claude\settings.json") for p in paths)
 
 
 def test_windows_missing_home_yields_no_user_paths() -> None:
@@ -50,3 +50,10 @@ def test_project_candidates() -> None:
     root = Path("/proj")
     names = {p.name for p in project_config_candidates(root)}
     assert names == {".mcp.json", ".env"}
+
+
+def test_windows_without_appdata_skips_desktop_config() -> None:
+    # USERPROFILE present but APPDATA absent: user-level paths only.
+    cands = claude_config_candidates("Windows", {"USERPROFILE": r"C:\Users\jane"})
+    assert cands  # the two ~/.claude candidates are still produced
+    assert not any("claude_desktop_config.json" in str(p) for p in cands)

@@ -34,6 +34,9 @@ jobs:
       - name: Type check (mypy)
         run: mypy src
       - name: Tests
+        # Coverage gate (branch=true + fail_under) lives in pyproject.toml
+        # [tool.coverage.*], so this command enforces it without duplicating
+        # the threshold here. Under-threshold coverage fails the job.
         run: pytest --cov=mcpscan --cov-report=term-missing
 
   security:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from pathlib import Path
 
@@ -62,7 +63,7 @@ def test_writes_json_and_html_reports(
     html_path = tmp_path / "report.html"
     rc = main(["scan", "--json", str(json_path), "--html", str(html_path)])
     assert rc == 0
-    assert json_path.exists() and json_path.read_text(encoding="utf-8").strip()
+    assert isinstance(json.loads(json_path.read_text(encoding="utf-8")), dict)
     assert html_path.exists() and "<html" in html_path.read_text(encoding="utf-8").lower()
     err = capsys.readouterr().err
     assert "wrote JSON report" in err
