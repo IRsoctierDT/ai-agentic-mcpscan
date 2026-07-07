@@ -36,7 +36,7 @@ jobs:
           echo "wrote sbom.cdx.json"
 
       - name: Attach SBOM + checksums to the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/SHA256SUMS
