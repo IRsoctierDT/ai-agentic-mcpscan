@@ -103,11 +103,15 @@ The version is **single-sourced** from `pyproject.toml` `[project].version`;
 `mcpscan.__version__` derives from the installed metadata. The release workflow
 refuses to publish if the git tag (`vX.Y.Z`) doesn't equal that field.
 
-**Recommended automation (Phase 3):** [release-please](https://github.com/googleapis/release-please)
-reads Conventional Commits since the last tag, opens a *release PR* that bumps
-the version and updates `CHANGELOG.md`; merging that PR tags `main` and triggers
-publishing. Every release stays a reviewed, approved PR — automation without
-losing the human gate.
+**Automated (Phase 3 — implemented, `.github/workflows/release-please.yml`):**
+[release-please](https://github.com/googleapis/release-please) reads Conventional
+Commits since the last tag and maintains a *release PR* that bumps the version in
+`pyproject.toml` and updates `CHANGELOG.md`. Merging that PR tags `main`, creates
+the GitHub Release, and the workflow's `publish` job builds + Trusted-Publishes
+to PyPI (gated on the `pypi` environment). Every release stays a reviewed,
+approved PR — automation without losing the human gate. The manifest is seeded at
+`0.1.0`, so release-please proposes `0.1.1+`; **v0.1.0 itself ships via the
+manual `release.yml` path.**
 
 ---
 
@@ -302,20 +306,26 @@ predictable, not speculative): `services/`, `packages/`, `docker/`, `infra/`
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | PR, push | lint, format, types, SAST, tests+coverage, build (3 OS × 3 Py) |
-| `codeql.yml` | PR, push, weekly | semantic security analysis (CodeQL) |
+| CodeQL (default setup) | GitHub-managed | semantic security analysis (python + actions); enabled in repo settings, not a workflow file |
 | `dependency-review.yml` | PR | block PRs that add vulnerable/incompatible deps |
 | `pr-title.yml` | PR | enforce Conventional Commit PR titles |
-| `release.yml` | GitHub Release | verify tag, build, Trusted-Publish to PyPI |
+| `release.yml` | GitHub Release | verify tag, build, Trusted-Publish to PyPI (manual path; used for v0.1.0) |
+| `release-please.yml` | push → main | maintain release PR (version + changelog), tag, and auto-publish 0.1.1+ to PyPI |
 | `sbom.yml` | GitHub Release | attach CycloneDX SBOM + SHA-256 checksums |
 | `dependabot.yml` | schedule | pip + github-actions update PRs, weekly |
 
-> **CodeQL & dependency-review are GitHub Advanced Security features.** They are
-> **free on public repositories** but unavailable on a private personal repo, so
-> both jobs are guarded with `if: github.event.repository.visibility == 'public'`
-> — they **skip (neutral) while the repo is private and self-activate the moment
-> it goes public**, with no further edit. Until then, SAST is covered by
-> `bandit` and SCA by `pip-audit` (both in the security job, which works on
-> private repos).
+> **CodeQL & dependency-review are GitHub Advanced Security features** — free on
+> **public** repos, unavailable on a private personal repo.
+> - **CodeQL** runs via GitHub's **default setup** (Settings → Code security),
+>   which is GitHub-managed and analyzes python + actions. Do **not** also commit
+>   an advanced `codeql.yml`: default + advanced conflict and the advanced run
+>   fails with a configuration error.
+> - **`dependency-review.yml`** is guarded with
+>   `if: github.event.repository.visibility == 'public'`, so it skips (neutral)
+>   while private and self-activates when the repo is public.
+>
+> On a private repo, SAST/SCA are still covered by `bandit` + `pip-audit` in the
+> security job.
 
 ---
 
@@ -331,8 +341,10 @@ branch protection (Phase 2). Ongoing development is never interrupted.
 - **Phase 2 — Enforcement (operator):** enable secret scanning + push
   protection, Dependabot alerts, and branch protection on `main` (Section 5).
   This is the point the gates become required.
-- **Phase 3 — Release automation:** adopt `release-please` for version bump +
-  changelog + tag from Conventional Commits; keep Trusted Publishing.
+- **Phase 3 — Release automation (implemented):** `release-please` maintains a
+  release PR (version bump + changelog + tag) from Conventional Commits, then
+  auto-publishes to PyPI via Trusted Publishing. Operator step: add a second PyPI
+  Trusted Publisher for `release-please.yml`.
 - **Phase 4 — Provenance & staging:** add build-provenance attestations and a
   TestPyPI pre-release path (`vX.Y.Z-rc.N`).
 - **Phase 5 — Multi-service (when justified):** introduce `develop`/`staging`
@@ -346,7 +358,11 @@ the UI once:
 
 - [ ] Settings → Code security: enable **Secret scanning** + **Push protection**.
 - [ ] Settings → Code security: enable **Dependabot alerts** + **security updates**.
-- [ ] Settings → Code security: enable **CodeQL** (advanced setup is provided by `codeql.yml`).
+- [ ] Settings → Code security: enable **CodeQL default setup** (GitHub-managed;
+      do not also commit an advanced `codeql.yml` — they conflict).
 - [ ] Settings → Branches → add a **ruleset/branch protection** for `main` per Section 5.
 - [ ] Settings → Environments → create **`pypi`** with a **required reviewer** (you).
+- [ ] PyPI → add a second **Trusted Publisher** for workflow **`release-please.yml`**
+      + environment **`pypi`** (alongside the existing `release.yml` one), so the
+      automated release path can publish.
 - [ ] (Optional) enforce **signed commits** once signing keys are set up.
