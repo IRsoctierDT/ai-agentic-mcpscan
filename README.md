@@ -14,9 +14,11 @@ command: `mcpscan`. License: Apache-2.0.
   (directly catching `0.0.0.0` / non-loopback exposure) plus a loopback probe of
   `/mcp` and `/sse`.
 - **Statically audits** Claude-ecosystem (`.claude/settings.json`, `.mcp.json`,
-  `claude_desktop_config.json`) and **Cursor** (`~/.cursor/mcp.json`,
-  `.cursor/mcp.json`) agent configs — plus `.env` — for plaintext secrets,
-  auto-approval flags, over-broad tool scopes, and unpinned versions.
+  `claude_desktop_config.json`), **Cursor** (`~/.cursor/mcp.json`,
+  `.cursor/mcp.json`), **Windsurf** (`~/.codeium/windsurf/mcp_config.json`), and
+  **Cline** (VS Code `globalStorage/…/cline_mcp_settings.json`) agent configs —
+  plus `.env` — for plaintext secrets, auto-approval flags, over-broad tool
+  scopes, and unpinned versions.
 - **Scores** each server **A–F** across four dimensions (exposure, credential
   hygiene, tool-scope breadth, version pinning).
 - **Reports** a prioritized, **redacted**, advise-only remediation in three
@@ -102,8 +104,8 @@ release. It's **Beta**: safe to run, but the CLI surface and check heuristics ma
 still change before `v1.0.0`.
 
 Roadmap toward 1.0: real-world dogfooding, SARIF + a GitHub code-scanning action,
-more host adapters (Cline, Windsurf, …), opt-in `--fix`, and authorized-LAN
-scanning behind an explicit gate.
+more host adapters, opt-in `--fix`, and authorized-LAN scanning behind an
+explicit gate.
 
 ## License
 

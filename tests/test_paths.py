@@ -6,7 +6,9 @@ from pathlib import PureWindowsPath
 
 from mcpscan.adapters.paths import (
     claude_config_candidates,
+    cline_config_candidates,
     cursor_config_candidates,
+    windsurf_config_candidates,
 )
 
 
@@ -61,6 +63,51 @@ def test_cursor_paths_windows() -> None:
 
 def test_cursor_missing_home_yields_no_paths() -> None:
     assert cursor_config_candidates("Linux", {}) == []
+
+
+def test_windsurf_paths_posix() -> None:
+    paths = [str(p) for p in windsurf_config_candidates("Darwin", {"HOME": "/Users/jane"})]
+    assert paths == ["/Users/jane/.codeium/windsurf/mcp_config.json"]
+
+
+def test_windsurf_missing_home_yields_no_paths() -> None:
+    assert windsurf_config_candidates("Linux", {}) == []
+
+
+def test_cline_paths_macos() -> None:
+    paths = [str(p) for p in cline_config_candidates("Darwin", {"HOME": "/Users/jane"})]
+    assert paths == [
+        "/Users/jane/Library/Application Support/Code/User/globalStorage/"
+        "saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
+    ]
+
+
+def test_cline_paths_linux() -> None:
+    paths = [str(p) for p in cline_config_candidates("Linux", {"HOME": "/home/jane"})]
+    assert paths == [
+        "/home/jane/.config/Code/User/globalStorage/"
+        "saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
+    ]
+
+
+def test_cline_paths_windows() -> None:
+    env = {"APPDATA": r"C:\Users\jane\AppData\Roaming"}
+    cands = cline_config_candidates("Windows", env)
+    assert any(isinstance(p, PureWindowsPath) for p in cands)
+    assert any(
+        str(p).endswith(
+            r"\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json"
+        )
+        for p in cands
+    )
+
+
+def test_cline_windows_without_appdata_yields_no_paths() -> None:
+    assert cline_config_candidates("Windows", {"USERPROFILE": r"C:\Users\jane"}) == []
+
+
+def test_cline_missing_home_yields_no_paths() -> None:
+    assert cline_config_candidates("Linux", {}) == []
 
 
 def test_windows_without_appdata_skips_desktop_config() -> None:
