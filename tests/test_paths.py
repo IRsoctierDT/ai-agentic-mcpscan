@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path, PureWindowsPath
+from pathlib import PureWindowsPath
 
 from mcpscan.adapters.paths import (
     claude_config_candidates,
-    project_config_candidates,
+    cursor_config_candidates,
 )
 
 
@@ -46,10 +46,21 @@ def test_missing_home_yields_no_user_paths() -> None:
     assert claude_config_candidates("Linux", {}) == []
 
 
-def test_project_candidates() -> None:
-    root = Path("/proj")
-    names = {p.name for p in project_config_candidates(root)}
-    assert names == {".mcp.json", ".env"}
+def test_cursor_paths_posix() -> None:
+    # Cursor uses a single global config at ~/.cursor/mcp.json on macOS/Linux.
+    for system, home in (("Darwin", "/Users/jane"), ("Linux", "/home/jane")):
+        paths = [str(p) for p in cursor_config_candidates(system, {"HOME": home})]
+        assert paths == [f"{home}/.cursor/mcp.json"]
+
+
+def test_cursor_paths_windows() -> None:
+    cands = cursor_config_candidates("Windows", {"USERPROFILE": r"C:\Users\jane"})
+    assert any(isinstance(p, PureWindowsPath) for p in cands)
+    assert any(str(p).endswith(r"\.cursor\mcp.json") for p in cands)
+
+
+def test_cursor_missing_home_yields_no_paths() -> None:
+    assert cursor_config_candidates("Linux", {}) == []
 
 
 def test_windows_without_appdata_skips_desktop_config() -> None:

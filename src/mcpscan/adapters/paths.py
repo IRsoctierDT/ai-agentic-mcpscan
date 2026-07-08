@@ -10,7 +10,7 @@ This is the *only* place in the codebase that branches on operating system
 from __future__ import annotations
 
 from collections.abc import Mapping
-from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
+from pathlib import PurePath, PurePosixPath, PureWindowsPath
 
 
 def _home(system: str, env: Mapping[str, str]) -> PurePath | None:
@@ -66,6 +66,16 @@ def claude_config_candidates(
     return candidates
 
 
-def project_config_candidates(project_root: Path) -> list[Path]:
-    """Return project-scoped MCP config paths under ``project_root``."""
-    return [project_root / ".mcp.json", project_root / ".env"]
+def cursor_config_candidates(
+    system: str,
+    env: Mapping[str, str],
+) -> list[PurePath]:
+    """Return the candidate user-level Cursor MCP config path for the given OS.
+
+    Cursor uses a single global config at ``~/.cursor/mcp.json`` on every OS
+    (``%USERPROFILE%\\.cursor\\mcp.json`` on Windows).
+    """
+    home = _home(system, env)
+    if home is None:
+        return []
+    return [home / ".cursor" / "mcp.json"]

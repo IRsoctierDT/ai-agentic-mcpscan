@@ -13,11 +13,11 @@ import os
 import platform
 import stat
 from collections.abc import Callable, Mapping, Sequence
-from pathlib import Path, PurePath
+from pathlib import Path
 
-from .adapters.base import ParsedConfig
+from .adapters.base import HostAdapter, ParsedConfig
 from .adapters.claude import ClaudeAdapter
-from .adapters.paths import project_config_candidates
+from .adapters.cursor import CursorAdapter
 from .checks import EnvFile, parse_env_text
 from .checks.exposure import check_socket_exposure
 from .checks.pinning import (
@@ -182,35 +182,34 @@ def scan(
     if online:
         fetch = osv_fetch if osv_fetch is not None else _default_osv_fetch
 
-    adapter = ClaudeAdapter()
+    adapters: tuple[HostAdapter, ...] = (ClaudeAdapter(), CursorAdapter())
     servers: list[Server] = []
 
-    # --- config discovery + audit ---
-    candidate_paths: list[PurePath] = list(adapter.default_config_paths(system, env))
-    project_paths: list[Path] = []
-    for root in roots:
-        project_paths.extend(project_config_candidates(root))
-
-    for cand in candidate_paths:
-        path = Path(str(cand))
-        if path.name == ".env":
-            continue
-        raw = _read_config_file(path)
-        if raw is None:
-            continue
-        servers.extend(_audit_config(adapter.parse(str(path), raw), fetch))
-
-    for path in project_paths:
-        if not path.exists():
-            continue
-        raw = _read_config_file(path)
-        if raw is None:
-            continue
-        if path.name == ".env":
-            mode = stat.S_IMODE(path.stat().st_mode)
-            servers.append(_audit_env_file(parse_env_text(str(path), raw, mode=mode)))
-        else:
+    # --- user-level (default) host configs ---
+    for adapter in adapters:
+        for cand in adapter.default_config_paths(system, env):
+            path = Path(str(cand))
+            raw = _read_config_file(path)
+            if raw is None:
+                continue
             servers.extend(_audit_config(adapter.parse(str(path), raw), fetch))
+
+    # --- project-scoped host configs + .env ---
+    for root in roots:
+        for adapter in adapters:
+            for path in adapter.project_config_paths(root):
+                if not path.exists():
+                    continue
+                raw = _read_config_file(path)
+                if raw is None:
+                    continue
+                servers.extend(_audit_config(adapter.parse(str(path), raw), fetch))
+        env_path = root / ".env"
+        if env_path.exists():
+            raw = _read_config_file(env_path)
+            if raw is not None:
+                mode = stat.S_IMODE(env_path.stat().st_mode)
+                servers.append(_audit_env_file(parse_env_text(str(env_path), raw, mode=mode)))
 
     # --- running-server discovery + exposure ---
     if enumerate_sockets:

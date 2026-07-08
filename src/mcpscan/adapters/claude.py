@@ -11,28 +11,15 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
-from .base import HostAdapter, ParsedConfig, ServerDecl
+from .base import (
+    HostAdapter,
+    ParsedConfig,
+    coerce_str_list,
+    parse_mcp_servers,
+)
 from .paths import claude_config_candidates
-
-
-def _coerce_args(value: object) -> tuple[str, ...]:
-    if isinstance(value, list):
-        return tuple(str(v) for v in value)
-    return ()
-
-
-def _coerce_env(value: object) -> tuple[tuple[str, str], ...]:
-    if isinstance(value, dict):
-        return tuple((str(k), str(v)) for k, v in value.items())
-    return ()
-
-
-def _coerce_str_list(value: object) -> tuple[str, ...]:
-    if isinstance(value, list):
-        return tuple(str(v) for v in value)
-    return ()
 
 
 class ClaudeAdapter(HostAdapter):
@@ -43,6 +30,9 @@ class ClaudeAdapter(HostAdapter):
     def default_config_paths(self, system: str, env: Mapping[str, str]) -> list[PurePath]:
         return claude_config_candidates(system, env)
 
+    def project_config_paths(self, project_root: Path) -> list[Path]:
+        return [project_root / ".mcp.json"]
+
     def parse(self, path: str, raw: str) -> ParsedConfig:
         try:
             data = json.loads(raw)
@@ -52,30 +42,13 @@ class ClaudeAdapter(HostAdapter):
         if not isinstance(data, dict):
             return ParsedConfig(path=path, parse_error="config root is not an object")
 
-        servers: list[ServerDecl] = []
-        mcp_servers = data.get("mcpServers")
-        if isinstance(mcp_servers, dict):
-            for name, spec in mcp_servers.items():
-                if not isinstance(spec, dict):
-                    continue
-                command = spec.get("command")
-                servers.append(
-                    ServerDecl(
-                        name=str(name),
-                        command=str(command) if command is not None else None,
-                        args=_coerce_args(spec.get("args")),
-                        env=_coerce_env(spec.get("env")),
-                        auto_approve=_coerce_str_list(spec.get("autoApprove")),
-                    )
-                )
-
         allow: tuple[str, ...] = ()
         permissions = data.get("permissions")
         if isinstance(permissions, dict):
-            allow = _coerce_str_list(permissions.get("allow"))
+            allow = coerce_str_list(permissions.get("allow"))
 
         return ParsedConfig(
             path=path,
-            servers=tuple(servers),
+            servers=parse_mcp_servers(data),
             allow_permissions=allow,
         )
