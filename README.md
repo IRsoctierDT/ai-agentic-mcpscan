@@ -4,8 +4,9 @@
 > local-agent setups. Find exposed servers, plaintext secrets, over-broad tool
 > scopes, and unpinned packages — then fix the highest-impact issues first.
 
-**Status:** ✅ MVP feature-complete (Sprints 1–4 built, full gate green) ·
-pending PyPI publish. CLI command: `mcpscan`. License: Apache-2.0.
+**Status:** Beta (`v0.1.x`) — safe to run (read-only, offline by default), but
+the CLI surface and check heuristics may still change before `v1.0.0`. CLI
+command: `mcpscan`. License: Apache-2.0.
 
 ## What it does (MVP)
 
