@@ -4,6 +4,34 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.1.0...ai-agentic-mcpscan-v0.2.0) (2026-07-08)
+
+
+### Features
+
+* **adapters:** add Cursor host adapter ([#23](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/23)) ([443b65a](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/443b65a156dd8e0a6c8238079900b5e6d625f671))
+* **sprint-1:** foundations — domain model, path resolver, safe reader, CI ([2cb9d64](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/2cb9d641ddbe779c82ed26b4331828a7201a5647))
+* **sprint-2:** core engine — discovery, Claude adapter, 4 check families, scoring ([48938ba](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/48938bac431e3f2685a08e06d4a2653bedce2a29))
+* **sprint-3:** reporting — terminal, stable JSON, self-contained HTML ([0e87f56](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/0e87f5652e16beb9f9a1adff2854b45e8e3af97e))
+* **sprint-4:** online enrichment, self-scan, security sign-off, docs ([25f9913](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/25f9913087c685f688adb92e26435456176d2cdd))
+
+
+### Bug Fixes
+
+* **report:** make path relativization separator-agnostic (Windows CI) ([2484c99](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/2484c99a2c16738b27e9794ffd3db9985e082c40))
+
+
+### Documentation
+
+* add CHANGELOG for v0.1.0 ([#8](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/8)) ([729b791](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/729b7919a1003d3c8139fc846f8a799f734b9bbf))
+* add GitHub Pages landing site ([#9](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/9)) ([ac245fc](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/ac245fc70a9ff9649dd7923d90d5c8063df9f0b9))
+* **arch:** Principal Architect validation + component design ([61a309f](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/61a309f9581ab7b290e69353573f2b593139ef43))
+* **cli:** document redaction boundary at the terminal print ([#22](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/22)) ([6e0a3d0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/6e0a3d08e79c9e5771d4729e96757b1dbf4dd9fa))
+* **devsecops:** add the Actions create-PRs operator setting ([#24](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/24)) ([c71f903](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/c71f903caa718e4f13c9c973dbdbdeee20be7ff6))
+* **readme:** reflect v0.1.0 released on PyPI ([#21](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/21)) ([d953dc0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/d953dc0155aae6406fec5e9d9a27d280928177d2))
+* **readme:** set maturity expectation to Beta (v0.1.x) ([#20](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/20)) ([0833884](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/08338849f3d538e9464548de08d912da69744860))
+* **review:** full-team backlog review gate (Product Council, Test, Security, Code Quality) ([9efb9dd](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/9efb9dd507ddef191b87626b16b91eadd43beaaf))
+
 ## [0.1.0]
 
 First public release — a local-first, offline-by-default security posture
