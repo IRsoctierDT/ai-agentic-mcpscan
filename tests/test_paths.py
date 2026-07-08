@@ -7,6 +7,7 @@ from pathlib import PureWindowsPath
 from mcpscan.adapters.paths import (
     claude_config_candidates,
     cursor_config_candidates,
+    windsurf_config_candidates,
 )
 
 
@@ -61,6 +62,15 @@ def test_cursor_paths_windows() -> None:
 
 def test_cursor_missing_home_yields_no_paths() -> None:
     assert cursor_config_candidates("Linux", {}) == []
+
+
+def test_windsurf_paths_posix() -> None:
+    paths = [str(p) for p in windsurf_config_candidates("Darwin", {"HOME": "/Users/jane"})]
+    assert paths == ["/Users/jane/.codeium/windsurf/mcp_config.json"]
+
+
+def test_windsurf_missing_home_yields_no_paths() -> None:
+    assert windsurf_config_candidates("Linux", {}) == []
 
 
 def test_windows_without_appdata_skips_desktop_config() -> None:

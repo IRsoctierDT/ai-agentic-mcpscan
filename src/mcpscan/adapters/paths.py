@@ -79,3 +79,18 @@ def cursor_config_candidates(
     if home is None:
         return []
     return [home / ".cursor" / "mcp.json"]
+
+
+def windsurf_config_candidates(
+    system: str,
+    env: Mapping[str, str],
+) -> list[PurePath]:
+    """Return the candidate user-level Windsurf MCP config path for the given OS.
+
+    Windsurf (Codeium) uses a single global config at
+    ``~/.codeium/windsurf/mcp_config.json`` on every OS.
+    """
+    home = _home(system, env)
+    if home is None:
+        return []
+    return [home / ".codeium" / "windsurf" / "mcp_config.json"]

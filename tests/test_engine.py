@@ -186,3 +186,13 @@ def test_cursor_user_level_config_is_discovered(tmp_path: Path) -> None:
     report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
     ids = {f.id for s in report.servers for f in s.findings}
     assert "CRED-PLAINTEXT" in ids
+
+
+def test_windsurf_user_level_config_is_discovered(tmp_path: Path) -> None:
+    # Windsurf's global config at ~/.codeium/windsurf/mcp_config.json.
+    ws_dir = tmp_path / ".codeium" / "windsurf"
+    ws_dir.mkdir(parents=True)
+    (ws_dir / "mcp_config.json").write_text(json.dumps(CURSOR_VULN), encoding="utf-8")
+    report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
+    ids = {f.id for s in report.servers for f in s.findings}
+    assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids

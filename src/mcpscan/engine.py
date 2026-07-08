@@ -18,6 +18,7 @@ from pathlib import Path
 from .adapters.base import HostAdapter, ParsedConfig
 from .adapters.claude import ClaudeAdapter
 from .adapters.cursor import CursorAdapter
+from .adapters.windsurf import WindsurfAdapter
 from .checks import EnvFile, parse_env_text
 from .checks.exposure import check_socket_exposure
 from .checks.pinning import (
@@ -182,7 +183,7 @@ def scan(
     if online:
         fetch = osv_fetch if osv_fetch is not None else _default_osv_fetch
 
-    adapters: tuple[HostAdapter, ...] = (ClaudeAdapter(), CursorAdapter())
+    adapters: tuple[HostAdapter, ...] = (ClaudeAdapter(), CursorAdapter(), WindsurfAdapter())
     servers: list[Server] = []
 
     # --- user-level (default) host configs ---
