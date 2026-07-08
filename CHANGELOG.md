@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.2.0...ai-agentic-mcpscan-v0.3.0) (2026-07-08)
+
+
+### Features
+
+* **adapters:** add Windsurf and Cline host adapters ([#26](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/26)) ([a3f9325](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/a3f9325e2a9b45a19088896104f9330c016b2b3c))
+
 ## [0.2.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.1.0...ai-agentic-mcpscan-v0.2.0) (2026-07-08)
 
 
