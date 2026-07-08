@@ -91,7 +91,9 @@ AI Agentic MCPscan — overall posture: F
 the **Security** tab, with per-finding severity (`security-severity`) and stable
 fingerprints so alerts track across commits. Paths inside the scanned repo are
 emitted repo-relative so alerts annotate the offending line; secrets are never
-present (only the redacted fingerprint). Drop this into a workflow:
+present (only the redacted fingerprint). SARIF covers **config-file** findings;
+running-socket exposure (no source file) stays in the terminal/JSON/HTML views.
+Drop this into a workflow:
 
 ```yaml
 permissions:

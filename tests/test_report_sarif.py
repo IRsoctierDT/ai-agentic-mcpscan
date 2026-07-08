@@ -146,7 +146,9 @@ def test_uri_outside_base_is_privatized_file_url() -> None:
     assert "jane" not in uri
 
 
-def test_socket_location_passes_through() -> None:
+def test_scheme_location_is_excluded() -> None:
+    # A scheme-based non-file location (socket://…) is out of scope for code
+    # scanning — GitHub requires every result URI to share the file scheme.
     f = _finding(
         id="EXPOSURE-WILDCARD",
         dimension=Dimension.EXPOSURE,
@@ -155,16 +157,14 @@ def test_socket_location_passes_through() -> None:
         secret=None,
     )
     doc = json.loads(render_sarif(_report(f), base="/repo"))
-    uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"][
-        "uri"
-    ]
-    assert uri == "socket://0.0.0.0:8000"
+    assert doc["runs"][0]["results"] == []
+    assert doc["runs"][0]["tool"]["driver"]["rules"] == []
 
 
-def test_bare_host_port_gets_socket_scheme() -> None:
+def test_bare_host_port_finding_is_excluded() -> None:
     # A running-socket finding (EXPOSE-BIND) uses a scheme-less "host:port"
-    # location. A colon in the first URI segment is invalid per GitHub's SARIF
-    # parser, so it must be given a scheme rather than emitted verbatim.
+    # location with no source file. GitHub rejects a non-file URI, so it is
+    # dropped from the SARIF (it still appears in the other renderers).
     f = _finding(
         id="EXPOSE-BIND",
         dimension=Dimension.EXPOSURE,
@@ -173,16 +173,27 @@ def test_bare_host_port_gets_socket_scheme() -> None:
         secret=None,
     )
     doc = json.loads(render_sarif(_report(f), base="/repo"))
-    uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"][
-        "uri"
-    ]
-    assert uri == "socket://0.0.0.0:22"
-    # Validity rule: a scheme-less (relative) URI must not carry a colon in its
-    # first path segment — that is exactly what GitHub's SARIF parser rejects.
-    for res in doc["runs"][0]["results"]:
+    assert doc["runs"][0]["results"] == []
+
+
+def test_file_findings_kept_when_mixed_with_network_findings() -> None:
+    # A file finding survives; a co-occurring host:port finding is dropped.
+    file_f = _finding(location=Location(path="/repo/.mcp.json", line=4))
+    net_f = _finding(
+        id="EXPOSE-BIND",
+        severity=Severity.HIGH,
+        location=Location(path="0.0.0.0:22"),
+        secret=None,
+    )
+    doc = json.loads(render_sarif(_report(file_f, net_f), base="/repo"))
+    results = doc["runs"][0]["results"]
+    assert len(results) == 1
+    uri = results[0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+    assert uri == ".mcp.json"
+    # Every emitted URI is file-scoped: relative, or file://…, never a bare host:port.
+    for res in results:
         u = res["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
-        if "://" not in u:  # relative reference
-            assert ":" not in u.split("/", 1)[0]
+        assert u.startswith("file://") or ":" not in u.split("/", 1)[0]
 
 
 def test_path_equal_to_base_becomes_dot() -> None:

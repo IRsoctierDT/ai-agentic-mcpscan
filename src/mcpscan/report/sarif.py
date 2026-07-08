@@ -12,6 +12,12 @@ is repo-relative, so paths under ``base`` (the scanned root) are emitted
 relative to it. Paths outside the repo (e.g. user-home host configs) keep the
 ``~`` privacy relativization and simply don't annotate — they still appear in
 the log.
+
+Scope: SARIF is a *source-file* format and GitHub requires every result URI to
+share the checkout's ``file`` scheme, so findings without a filesystem location
+— running-socket exposure, whose location is a ``host:port`` endpoint — are
+**omitted** here. They remain in the terminal, JSON, and HTML renderers; only
+this code-scanning view is file-scoped.
 """
 
 from __future__ import annotations
@@ -50,19 +56,26 @@ _SECURITY_SEVERITY: dict[Severity, str] = {
 }
 
 
-def _artifact_uri(path: str, base: str | None, opts: RenderOptions) -> str:
-    """Map a finding location to a valid SARIF ``artifactLocation.uri``.
+def _source_uri(path: str, base: str | None, opts: RenderOptions) -> str | None:
+    """Map a finding location to a SARIF ``artifactLocation.uri``, or ``None``.
 
-    Repo-relative when under ``base`` (so GitHub can annotate the file);
-    otherwise ``~``-privatized and, if still absolute, expressed as a ``file://``
-    URI. Opaque scheme locations (``socket://host:port``) pass through unchanged.
-    A network endpoint like ``0.0.0.0:22`` (no scheme, no path) is *not* a valid
-    URI reference — a colon in the first segment fails GitHub's SARIF parser — so
-    it is given a ``socket://`` scheme; the alert is created but not source-mapped.
+    Returns ``None`` for non-filesystem locations (a ``scheme://`` URI, or a
+    ``host:port`` network endpoint) — GitHub code scanning requires every result
+    URI to share the checkout's ``file`` scheme, so such findings are dropped
+    from the SARIF (they remain in the other renderers).
+
+    For filesystem paths: repo-relative when under ``base`` (so GitHub can
+    annotate the file); otherwise ``~``-privatized and, if still absolute,
+    expressed as a ``file://`` URI.
     """
     if "://" in path:
-        return path
+        return None  # scheme-based non-file location, e.g. socket://host:port
     norm = path.replace("\\", "/")
+    first = norm.split("/", 1)[0]
+    # A colon in the first segment that is not a Windows drive letter marks a
+    # network endpoint (host:port), not a file — out of scope for code scanning.
+    if ":" in first and not (len(first) == 2 and first[1] == ":"):
+        return None
     if base:
         b = base.replace("\\", "/").rstrip("/")
         if norm == b:
@@ -74,10 +87,6 @@ def _artifact_uri(path: str, base: str | None, opts: RenderOptions) -> str:
         return "file://" + disp
     if len(disp) > 2 and disp[1] == ":":  # Windows drive, e.g. C:/Users/...
         return "file:///" + disp
-    # A colon in the first path segment makes this an invalid URI reference
-    # (e.g. the host:port of a running-socket finding) — give it a scheme.
-    if ":" in disp.split("/", 1)[0]:
-        return "socket://" + disp
     return disp  # already relative, or ~/… privacy form
 
 
@@ -131,10 +140,12 @@ def report_to_sarif(
 
     for server in report.servers:
         for finding in ordered_findings(server):
+            uri = _source_uri(finding.location.path, base, opts)
+            if uri is None:
+                continue  # non-file location (host:port) — out of scope for code scanning
             if finding.id not in rule_index:
                 rule_index[finding.id] = len(rules)
                 rules.append(_rule(finding))
-            uri = _artifact_uri(finding.location.path, base, opts)
             physical: dict[str, object] = {"artifactLocation": {"uri": uri}}
             if finding.location.line is not None and finding.location.line >= 1:
                 physical["region"] = {"startLine": finding.location.line}
