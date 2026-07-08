@@ -1,6 +1,6 @@
 # Copyright 2026 Ivan Rozenblad
 # SPDX-License-Identifier: Apache-2.0
-"""Report renderers: terminal, JSON, and self-contained HTML.
+"""Report renderers: terminal, JSON, self-contained HTML, and SARIF 2.1.0.
 
 All renderers consume only the pure ``domain`` model. Secrets are already
 fingerprinted before a Report exists (R1), so no renderer can leak a raw value.

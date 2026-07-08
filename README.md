@@ -21,8 +21,9 @@ command: `mcpscan`. License: Apache-2.0.
   scopes, and unpinned versions.
 - **Scores** each server **A–F** across four dimensions (exposure, credential
   hygiene, tool-scope breadth, version pinning).
-- **Reports** a prioritized, **redacted**, advise-only remediation in three
-  forms: terminal, a self-contained HTML file, and stable JSON.
+- **Reports** a prioritized, **redacted**, advise-only remediation in four
+  forms: terminal, a self-contained HTML file, stable JSON, and SARIF 2.1.0 for
+  GitHub code scanning.
 
 ## Trust properties (by design)
 
@@ -57,6 +58,7 @@ mcpscan scan                          # scan localhost + cwd project configs
 mcpscan scan --root ~/project         # scan a specific project root (repeatable)
 mcpscan scan --json report.json       # also write a stable JSON report (0600)
 mcpscan scan --html report.html       # also write a self-contained HTML report
+mcpscan scan --sarif results.sarif    # also write SARIF 2.1.0 for code scanning
 mcpscan scan --fail-on critical       # CI: exit non-zero only on Critical
 mcpscan scan --online                 # opt-in OSV enrichment (discloses egress)
 mcpscan scan --show-secrets           # reveal masked (first-2/last-2) values
@@ -83,6 +85,31 @@ AI Agentic MCPscan — overall posture: F
              fix:   Pin the package to an exact version (e.g. npx some-pkg@1.2.3).
 ```
 
+### GitHub code scanning (SARIF)
+
+`--sarif` writes a SARIF 2.1.0 log that GitHub ingests as code-scanning alerts on
+the **Security** tab, with per-finding severity (`security-severity`) and stable
+fingerprints so alerts track across commits. Paths inside the scanned repo are
+emitted repo-relative so alerts annotate the offending line; secrets are never
+present (only the redacted fingerprint). Drop this into a workflow:
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+steps:
+  - uses: actions/checkout@v7
+  - uses: actions/setup-python@v5
+    with: { python-version: "3.11" }
+  - run: pip install ai-agentic-mcpscan
+  - run: mcpscan scan --sarif results.sarif --fail-on critical
+    continue-on-error: true
+  - uses: github/codeql-action/upload-sarif@v4
+    with: { sarif_file: results.sarif }
+```
+
+This repo dogfoods it in [`.github/workflows/mcpscan.yml`](.github/workflows/mcpscan.yml).
+
 ## Documentation
 
 | Doc | What it is |
@@ -103,9 +130,9 @@ pytest on macOS/Linux/Windows × Python 3.11–3.13), with SBOM + checksums on e
 release. It's **Beta**: safe to run, but the CLI surface and check heuristics may
 still change before `v1.0.0`.
 
-Roadmap toward 1.0: real-world dogfooding, SARIF + a GitHub code-scanning action,
-more host adapters, opt-in `--fix`, and authorized-LAN scanning behind an
-explicit gate.
+Roadmap toward 1.0: real-world dogfooding, more host adapters, opt-in `--fix`,
+and authorized-LAN scanning behind an explicit gate. **Done:** SARIF 2.1.0
+output + a GitHub code-scanning workflow.
 
 ## License
 
