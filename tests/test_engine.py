@@ -143,3 +143,46 @@ def test_unreadable_config_is_skipped(tmp_path: Path) -> None:
     report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
     assert report.servers == ()
     assert report.overall_grade == "A"
+
+
+# --- Cursor host adapter (second adapter, ADR-4) ---
+CURSOR_VULN = {
+    "mcpServers": {
+        "leaky": {
+            "command": "npx",
+            "args": ["-y", "db-mcp-server"],
+            "env": {"POSTGRES_PASSWORD": "S3cr3t-Pa55w0rd-abcdef123456"},
+        }
+    }
+}
+
+
+def test_cursor_project_config_is_discovered(tmp_path: Path) -> None:
+    cursor_dir = tmp_path / ".cursor"
+    cursor_dir.mkdir()
+    (cursor_dir / "mcp.json").write_text(json.dumps(CURSOR_VULN), encoding="utf-8")
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
+    leaky = [s for s in report.servers if s.id.endswith("#leaky")]
+    assert len(leaky) == 1
+    assert "mcp.json" in leaky[0].id and ".cursor" in leaky[0].id
+    ids = {f.id for f in leaky[0].findings}
+    assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
+
+
+def test_cursor_and_claude_project_configs_coexist(tmp_path: Path) -> None:
+    # Both adapters run over the same project root, each on its own file.
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".cursor" / "mcp.json").write_text(json.dumps(CURSOR_VULN), encoding="utf-8")
+    (tmp_path / ".mcp.json").write_text(json.dumps(CLEAN_CONFIG), encoding="utf-8")
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
+    names = {s.id.rsplit("#", 1)[-1] for s in report.servers}
+    assert {"leaky", "safe"} <= names  # cursor's leaky + claude's safe
+
+
+def test_cursor_user_level_config_is_discovered(tmp_path: Path) -> None:
+    cursor_dir = tmp_path / ".cursor"
+    cursor_dir.mkdir()
+    (cursor_dir / "mcp.json").write_text(json.dumps(CURSOR_VULN), encoding="utf-8")
+    report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
+    ids = {f.id for s in report.servers for f in s.findings}
+    assert "CRED-PLAINTEXT" in ids
