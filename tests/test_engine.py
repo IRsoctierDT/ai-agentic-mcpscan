@@ -196,3 +196,21 @@ def test_windsurf_user_level_config_is_discovered(tmp_path: Path) -> None:
     report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
     ids = {f.id for s in report.servers for f in s.findings}
     assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
+
+
+def test_cline_user_level_config_is_discovered(tmp_path: Path) -> None:
+    # Cline's global config lives under the VS Code globalStorage tree.
+    cline_dir = (
+        tmp_path
+        / ".config"
+        / "Code"
+        / "User"
+        / "globalStorage"
+        / "saoudrizwan.claude-dev"
+        / "settings"
+    )
+    cline_dir.mkdir(parents=True)
+    (cline_dir / "cline_mcp_settings.json").write_text(json.dumps(CURSOR_VULN), encoding="utf-8")
+    report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
+    ids = {f.id for s in report.servers for f in s.findings}
+    assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids

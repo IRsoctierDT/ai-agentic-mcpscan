@@ -94,3 +94,35 @@ def windsurf_config_candidates(
     if home is None:
         return []
     return [home / ".codeium" / "windsurf" / "mcp_config.json"]
+
+
+def cline_config_candidates(
+    system: str,
+    env: Mapping[str, str],
+) -> list[PurePath]:
+    """Return the candidate user-level Cline MCP config path for the given OS.
+
+    Cline is a VS Code extension (``saoudrizwan.claude-dev``) that stores its MCP
+    servers under the editor's ``globalStorage``. The VS Code ``User`` directory
+    is OS-specific, mirroring the Claude Desktop layout: ``Application Support``
+    on macOS, ``%APPDATA%`` on Windows, ``~/.config`` elsewhere.
+    """
+    tail = ("globalStorage", "saoudrizwan.claude-dev", "settings", "cline_mcp_settings.json")
+
+    if system == "Darwin":
+        home = _home(system, env)
+        if home is None:
+            return []
+        user_dir = home / "Library" / "Application Support" / "Code" / "User"
+    elif system == "Windows":
+        appdata = env.get("APPDATA")
+        if not appdata:
+            return []
+        user_dir = PureWindowsPath(appdata) / "Code" / "User"
+    else:  # Linux and other POSIX
+        home = _home(system, env)
+        if home is None:
+            return []
+        user_dir = home / ".config" / "Code" / "User"
+
+    return [user_dir.joinpath(*tail)]
