@@ -360,6 +360,10 @@ the UI once:
 - [ ] Settings → Code security: enable **Dependabot alerts** + **security updates**.
 - [ ] Settings → Code security: enable **CodeQL default setup** (GitHub-managed;
       do not also commit an advanced `codeql.yml` — they conflict).
+- [ ] Settings → Actions → General → Workflow permissions: enable **"Allow
+      GitHub Actions to create and approve pull requests"**. **Required for
+      release-please** to open its release PR — without it the workflow fails with
+      *"GitHub Actions is not permitted to create or approve pull requests."*
 - [ ] Settings → Branches → add a **ruleset/branch protection** for `main` per Section 5.
 - [ ] Settings → Environments → create **`pypi`** with a **required reviewer** (you).
 - [ ] PyPI → add a second **Trusted Publisher** for workflow **`release-please.yml`**
