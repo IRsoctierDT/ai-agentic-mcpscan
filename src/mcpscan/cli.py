@@ -112,6 +112,13 @@ def main(argv: list[str] | None = None) -> int:
         home=str(Path.home()),
     )
 
+    # Redaction-safe by construction: secrets are reduced to non-reversible
+    # fingerprints at detection (redaction.fingerprint_secret) and never reach
+    # the report raw. Default output shows only "[redacted len=N sha256:XX]";
+    # --show-secrets reveals at most a first-2/last-2 masked preview and prints a
+    # warning (see report.common.secret_str, docs/SECURITY_SIGNOFF.md, T-305).
+    # CodeQL py/clear-text-logging-sensitive-data flags this sink because it
+    # can't model that redaction boundary as a sanitizer — accepted, documented.
     print(render_terminal(report, opts), end="")
     if args.json is not None:
         write_report(args.json, render_json(report, opts))
