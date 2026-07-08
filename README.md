@@ -34,13 +34,11 @@ command: `mcpscan`. License: Apache-2.0.
 
 ## Install
 
-Once published to PyPI:
-
 ```bash
 pipx install ai-agentic-mcpscan   # provides the `mcpscan` command
 ```
 
-Or from source today:
+Or from source:
 
 ```bash
 git clone https://github.com/IRsoctierDT/ai-agentic-mcpscan.git
@@ -95,13 +93,16 @@ AI Agentic MCPscan — overall posture: F
 
 ## Status & roadmap
 
-MVP is feature-complete across the four sprints (Foundations → Engine →
-Reporting → Integration & hardening), built behind a green CI gate (ruff, mypy
---strict, bandit, pytest on macOS/Linux/Windows × Python 3.11–3.13). The only
-remaining step is the human-gated PyPI publish.
+**v0.1.0 is released on [PyPI](https://pypi.org/project/ai-agentic-mcpscan/)** —
+feature-complete across the four sprints (Foundations → Engine → Reporting →
+Integration & hardening), behind a green CI gate (ruff, mypy --strict, bandit,
+pytest on macOS/Linux/Windows × Python 3.11–3.13), with SBOM + checksums on every
+release. It's **Beta**: safe to run, but the CLI surface and check heuristics may
+still change before `v1.0.0`.
 
-Roadmap: SARIF + a GitHub code-scanning action, more host adapters (Cursor,
-Cline, …), opt-in `--fix`, and authorized-LAN scanning behind an explicit gate.
+Roadmap toward 1.0: real-world dogfooding, SARIF + a GitHub code-scanning action,
+more host adapters (Cursor, Cline, …), opt-in `--fix`, and authorized-LAN
+scanning behind an explicit gate.
 
 ## License
 
