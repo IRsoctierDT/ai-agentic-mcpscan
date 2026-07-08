@@ -51,11 +51,14 @@ _SECURITY_SEVERITY: dict[Severity, str] = {
 
 
 def _artifact_uri(path: str, base: str | None, opts: RenderOptions) -> str:
-    """Map a finding location to a SARIF ``artifactLocation.uri``.
+    """Map a finding location to a valid SARIF ``artifactLocation.uri``.
 
     Repo-relative when under ``base`` (so GitHub can annotate the file);
     otherwise ``~``-privatized and, if still absolute, expressed as a ``file://``
     URI. Opaque scheme locations (``socket://host:port``) pass through unchanged.
+    A network endpoint like ``0.0.0.0:22`` (no scheme, no path) is *not* a valid
+    URI reference — a colon in the first segment fails GitHub's SARIF parser — so
+    it is given a ``socket://`` scheme; the alert is created but not source-mapped.
     """
     if "://" in path:
         return path
@@ -71,6 +74,10 @@ def _artifact_uri(path: str, base: str | None, opts: RenderOptions) -> str:
         return "file://" + disp
     if len(disp) > 2 and disp[1] == ":":  # Windows drive, e.g. C:/Users/...
         return "file:///" + disp
+    # A colon in the first path segment makes this an invalid URI reference
+    # (e.g. the host:port of a running-socket finding) — give it a scheme.
+    if ":" in disp.split("/", 1)[0]:
+        return "socket://" + disp
     return disp  # already relative, or ~/… privacy form
 
 

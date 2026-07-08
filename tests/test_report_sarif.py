@@ -161,6 +161,30 @@ def test_socket_location_passes_through() -> None:
     assert uri == "socket://0.0.0.0:8000"
 
 
+def test_bare_host_port_gets_socket_scheme() -> None:
+    # A running-socket finding (EXPOSE-BIND) uses a scheme-less "host:port"
+    # location. A colon in the first URI segment is invalid per GitHub's SARIF
+    # parser, so it must be given a scheme rather than emitted verbatim.
+    f = _finding(
+        id="EXPOSE-BIND",
+        dimension=Dimension.EXPOSURE,
+        severity=Severity.HIGH,
+        location=Location(path="0.0.0.0:22"),
+        secret=None,
+    )
+    doc = json.loads(render_sarif(_report(f), base="/repo"))
+    uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"][
+        "uri"
+    ]
+    assert uri == "socket://0.0.0.0:22"
+    # Validity rule: a scheme-less (relative) URI must not carry a colon in its
+    # first path segment — that is exactly what GitHub's SARIF parser rejects.
+    for res in doc["runs"][0]["results"]:
+        u = res["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+        if "://" not in u:  # relative reference
+            assert ":" not in u.split("/", 1)[0]
+
+
 def test_path_equal_to_base_becomes_dot() -> None:
     f = _finding(location=Location(path="/repo"))
     doc = json.loads(render_sarif(_report(f), base="/repo"))
