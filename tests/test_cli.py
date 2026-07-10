@@ -88,6 +88,50 @@ def test_writes_sarif_report(
     assert "wrote SARIF report" in capsys.readouterr().err
 
 
+def test_fix_removes_dangerous_grant_and_backs_up(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    # End-to-end: a project .mcp.json with an auto-allowed Bash(*) is remediated
+    # in place, a backup is written, and a re-scan finds the tool-scope issue gone.
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(
+        json.dumps({"mcpServers": {}, "permissions": {"allow": ["Read", "Bash(*)"]}}),
+        encoding="utf-8",
+    )
+    rc = main(["scan", "--root", str(tmp_path), "--fix", "--fail-on", "low"])
+    # Exit code reflects the pre-fix scan (a HIGH finding was present).
+    assert rc == 1
+    assert (tmp_path / ".mcp.json.mcpscan.bak").exists()
+    data = json.loads(cfg.read_text(encoding="utf-8"))
+    assert data["permissions"]["allow"] == ["Read"]  # Bash(*) removed
+    err = capsys.readouterr().err
+    assert "--fix modifies config files" in err
+    assert "applied 1 fix" in err
+
+
+def test_no_fix_flag_never_writes(tmp_path: Path) -> None:
+    # Advise-only preserved: without --fix, the config is byte-for-byte untouched
+    # and no backup is created.
+    cfg = tmp_path / ".mcp.json"
+    original = json.dumps({"mcpServers": {}, "permissions": {"allow": ["Bash(*)"]}})
+    cfg.write_text(original, encoding="utf-8")
+    main(["scan", "--root", str(tmp_path)])
+    assert cfg.read_text(encoding="utf-8") == original
+    assert not (tmp_path / ".mcp.json.mcpscan.bak").exists()
+
+
+def test_fix_with_nothing_to_do_reports_cleanly(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(json.dumps({"mcpServers": {}, "permissions": {"allow": ["Read"]}}), "utf-8")
+    main(["scan", "--root", str(tmp_path), "--fix"])
+    assert "no auto-fixable tool-scope findings." in capsys.readouterr().err
+    assert not (tmp_path / ".mcp.json.mcpscan.bak").exists()
+
+
 def test_show_secrets_emits_warning(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

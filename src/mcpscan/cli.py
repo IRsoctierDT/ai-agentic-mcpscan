@@ -3,8 +3,9 @@
 """Command-line entry point for AI Agentic MCPscan (``mcpscan``).
 
 Wires the scan engine to the renderers. Honors the spec's trust properties:
-offline by default, secrets redacted unless ``--show-secrets``, and the only
-file writes are the reports the user explicitly requests (``--json`` / ``--html``).
+offline by default, secrets redacted unless ``--show-secrets``, and — advise-only
+by default — the only file writes are the reports the user explicitly requests
+(``--json`` / ``--html`` / ``--sarif``) plus the config edits of opt-in ``--fix``.
 """
 
 from __future__ import annotations
@@ -79,6 +80,16 @@ def build_parser() -> argparse.ArgumentParser:
             "to api.osv.dev (sends only package name+version). Off by default."
         ),
     )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help=(
+            "Apply safe, reversible remediations to discovered configs: remove "
+            "dangerous/wildcard entries from permission allow-lists and autoApprove. "
+            "Backs up each file to <path>.mcpscan.bak first. Off by default "
+            "(the tool is advise-only unless you pass --fix)."
+        ),
+    )
     return parser
 
 
@@ -138,7 +149,48 @@ def main(argv: list[str] | None = None) -> int:
         write_report(args.sarif, render_sarif(report, opts, base=str(Path.cwd())))
         print(f"wrote SARIF report: {args.sarif}", file=sys.stderr)
 
+    if args.fix:
+        _apply_fixes(args.root, opts)
+
     return _exit_code(report, args.fail_on)
+
+
+def _apply_fixes(roots: list[Path] | None, opts: object) -> None:
+    """Apply safe tool-scope remediations to discovered configs (``--fix``).
+
+    The single, explicit exception to advise-only: writes only when asked, backs
+    each file up first, and touches only over-broad permission/autoApprove grants.
+    """
+    from .engine import discover_host_config_files
+    from .fix import apply_fix_to_file, plan_config_fixes
+    from .io_safe import SafeReadError, safe_read_text
+
+    print(
+        "note: --fix modifies config files in place (backup written to "
+        "<path>.mcpscan.bak). Only over-broad tool-scope grants are removed; "
+        "credential and pinning findings still need a manual fix.",
+        file=sys.stderr,
+    )
+
+    total = 0
+    for path in discover_host_config_files(roots=roots):
+        try:
+            raw = safe_read_text(path, root=path.parent)
+        except SafeReadError:
+            continue
+        plan = plan_config_fixes(str(path), raw)
+        if not plan.changed or plan.new_text is None:
+            continue
+        backup = apply_fix_to_file(path, plan.new_text)
+        total += len(plan.fixes)
+        print(f"fixed {path} ({len(plan.fixes)} change(s); backup: {backup})", file=sys.stderr)
+        for fx in plan.fixes:
+            print(f"    removed {fx.removed!r} from {fx.where} [{fx.rule_id}]", file=sys.stderr)
+
+    if total == 0:
+        print("no auto-fixable tool-scope findings.", file=sys.stderr)
+    else:
+        print(f"applied {total} fix(es). Re-run mcpscan to confirm.", file=sys.stderr)
 
 
 def _exit_code(report: Report, fail_on: str) -> int:
