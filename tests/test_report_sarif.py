@@ -244,3 +244,88 @@ def test_clean_report_is_valid_empty_run() -> None:
     doc = report_to_sarif(clean)
     assert doc["runs"][0]["results"] == []
     assert doc["runs"][0]["tool"]["driver"]["rules"] == []
+
+
+# --- logical locations for network endpoints (ADR-16, lan --sarif) ---
+def test_logical_locations_emit_network_endpoint() -> None:
+    f = _finding(
+        id="LAN-EXPOSED",
+        dimension=Dimension.EXPOSURE,
+        severity=Severity.HIGH,
+        location=Location(path="192.168.10.20:3000"),
+        secret=None,
+    )
+    doc = json.loads(render_sarif(_report(f), logical_locations=True))
+    result = doc["runs"][0]["results"][0]
+    loc = result["locations"][0]
+    assert "physicalLocation" not in loc  # never a synthetic file
+    logical = loc["logicalLocations"][0]
+    assert logical == {
+        "name": "192.168.10.20:3000",
+        "fullyQualifiedName": "lan://192.168.10.20:3000",
+        "kind": "resource",
+    }
+    assert doc["runs"][0]["tool"]["driver"]["rules"][0]["id"] == "LAN-EXPOSED"
+
+
+def test_logical_locations_strip_scheme_prefix() -> None:
+    # A scheme-prefixed endpoint (lan://, socket://) yields the bare host:port.
+    f = _finding(
+        id="LAN-EXPOSED",
+        severity=Severity.HIGH,
+        location=Location(path="socket://10.0.0.5:8000"),
+        secret=None,
+    )
+    doc = json.loads(render_sarif(_report(f), logical_locations=True))
+    logical = doc["runs"][0]["results"][0]["locations"][0]["logicalLocations"][0]
+    assert logical["name"] == "10.0.0.5:8000"
+
+
+def test_logical_locations_off_by_default_still_drops_endpoints() -> None:
+    # The file-scoped scan view is unchanged: no logical_locations flag => dropped.
+    f = _finding(
+        id="LAN-EXPOSED",
+        severity=Severity.HIGH,
+        location=Location(path="192.168.10.20:3000"),
+        secret=None,
+    )
+    doc = json.loads(render_sarif(_report(f)))
+    assert doc["runs"][0]["results"] == []
+
+
+def test_logical_locations_keep_file_findings_physical() -> None:
+    # With the flag on, a file finding still gets a physicalLocation (mixed run).
+    file_f = _finding(location=Location(path="/repo/.mcp.json", line=4))
+    net_f = _finding(
+        id="LAN-EXPOSED",
+        severity=Severity.HIGH,
+        location=Location(path="192.168.10.20:3000"),
+        secret=None,
+    )
+    doc = json.loads(render_sarif(_report(file_f, net_f), base="/repo", logical_locations=True))
+    results = doc["runs"][0]["results"]
+    assert len(results) == 2
+    kinds = {("physicalLocation" in r["locations"][0]) for r in results}
+    assert kinds == {True, False}  # one physical, one logical
+
+
+def test_logical_location_fingerprints_are_distinct_per_endpoint() -> None:
+    a = _finding(id="LAN-EXPOSED", severity=Severity.HIGH, location=Location(path="10.0.0.1:3000"))
+    b = _finding(id="LAN-EXPOSED", severity=Severity.HIGH, location=Location(path="10.0.0.2:3000"))
+    doc = json.loads(render_sarif(_report(a, b), logical_locations=True))
+    fps = {r["partialFingerprints"]["mcpscanFindingHash/v1"] for r in doc["runs"][0]["results"]}
+    assert len(fps) == 2  # different endpoints -> different fingerprints
+
+
+def test_network_endpoint_helper_recognizes_and_rejects() -> None:
+    from mcpscan.report.sarif import _network_endpoint
+
+    assert _network_endpoint("192.168.1.5:3000") == "192.168.1.5:3000"
+    assert _network_endpoint("lan://10.0.0.1:8000") == "10.0.0.1:8000"
+    assert _network_endpoint("socket://[::1]:9000") == "[::1]:9000"
+    # A path component means it's a file-ish location, not a bare endpoint.
+    assert _network_endpoint("0.0.0.0:8000/mcp") is None
+    # A scheme URL with no port has no colon in the endpoint.
+    assert _network_endpoint("lan://justahostname") is None
+    # A Windows drive is a file, never an endpoint.
+    assert _network_endpoint("C:/Users/jane/.mcp.json") is None
