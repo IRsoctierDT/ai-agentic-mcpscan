@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.5.0...ai-agentic-mcpscan-v0.6.0) (2026-07-10)
+
+
+### Features
+
+* **adapters:** add VS Code host adapter (native MCP) ([#33](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/33)) ([4b144de](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/4b144dea6ee9232caf6f6e8dae187917e1f57e22))
+
 ## [0.5.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.4.0...ai-agentic-mcpscan-v0.5.0) (2026-07-10)
 
 
