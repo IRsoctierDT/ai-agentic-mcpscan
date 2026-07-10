@@ -16,10 +16,10 @@ command: `mcpscan`. License: Apache-2.0.
 - **Statically audits** Claude-ecosystem (`.claude/settings.json`, `.mcp.json`,
   `claude_desktop_config.json`), **Cursor** (`~/.cursor/mcp.json`,
   `.cursor/mcp.json`), **Windsurf** (`~/.codeium/windsurf/mcp_config.json`),
-  **Cline** (VS Code `globalStorage/…/cline_mcp_settings.json`), and **VS Code**
-  (`.vscode/mcp.json`, user `mcp.json`) agent configs — plus `.env` — for
-  plaintext secrets, auto-approval flags, over-broad tool scopes, and unpinned
-  versions.
+  **Cline** (VS Code `globalStorage/…/cline_mcp_settings.json`), **VS Code**
+  (`.vscode/mcp.json`, user `mcp.json`), and **Zed** (`.zed/settings.json`, user
+  `~/.config/zed/settings.json`) agent configs — plus `.env` — for plaintext
+  secrets, auto-approval flags, over-broad tool scopes, and unpinned versions.
 - **Scores** each server **A–F** across four dimensions (exposure, credential
   hygiene, tool-scope breadth, version pinning).
 - **Reports** a prioritized, **redacted**, advise-only remediation in four

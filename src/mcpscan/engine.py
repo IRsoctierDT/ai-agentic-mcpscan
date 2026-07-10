@@ -21,6 +21,7 @@ from .adapters.cline import ClineAdapter
 from .adapters.cursor import CursorAdapter
 from .adapters.vscode import VSCodeAdapter
 from .adapters.windsurf import WindsurfAdapter
+from .adapters.zed import ZedAdapter
 from .checks import EnvFile, parse_env_text
 from .checks.exposure import check_socket_exposure
 from .checks.pinning import (
@@ -57,6 +58,7 @@ def _adapters() -> tuple[HostAdapter, ...]:
         WindsurfAdapter(),
         ClineAdapter(),
         VSCodeAdapter(),
+        ZedAdapter(),
     )
 
 

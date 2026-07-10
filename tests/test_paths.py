@@ -10,6 +10,7 @@ from mcpscan.adapters.paths import (
     cursor_config_candidates,
     vscode_config_candidates,
     windsurf_config_candidates,
+    zed_config_candidates,
 )
 
 
@@ -133,6 +134,27 @@ def test_vscode_windows_without_appdata_yields_no_paths() -> None:
 
 def test_vscode_missing_home_yields_no_paths() -> None:
     assert vscode_config_candidates("Linux", {}) == []
+
+
+def test_zed_paths_use_dot_config_on_macos_and_linux() -> None:
+    # Zed uses ~/.config/zed on BOTH macOS and Linux (not ~/Library on macOS).
+    for system, home in (("Darwin", "/Users/jane"), ("Linux", "/home/jane")):
+        paths = [str(p) for p in zed_config_candidates(system, {"HOME": home})]
+        assert paths == [f"{home}/.config/zed/settings.json"]
+
+
+def test_zed_paths_windows() -> None:
+    cands = zed_config_candidates("Windows", {"APPDATA": r"C:\Users\jane\AppData\Roaming"})
+    assert any(isinstance(p, PureWindowsPath) for p in cands)
+    assert any(str(p).endswith(r"\Zed\settings.json") for p in cands)
+
+
+def test_zed_windows_without_appdata_yields_no_paths() -> None:
+    assert zed_config_candidates("Windows", {"USERPROFILE": r"C:\Users\jane"}) == []
+
+
+def test_zed_missing_home_yields_no_paths() -> None:
+    assert zed_config_candidates("Linux", {}) == []
 
 
 def test_windows_without_appdata_skips_desktop_config() -> None:

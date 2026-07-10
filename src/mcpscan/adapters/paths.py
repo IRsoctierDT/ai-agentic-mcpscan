@@ -148,3 +148,26 @@ def vscode_config_candidates(
     if user_dir is None:
         return []
     return [user_dir / "mcp.json"]
+
+
+def zed_config_candidates(
+    system: str,
+    env: Mapping[str, str],
+) -> list[PurePath]:
+    """Return the candidate user-level Zed settings path for the given OS.
+
+    Zed keeps MCP servers (``context_servers``) in its main ``settings.json``.
+    Notably Zed uses ``~/.config/zed`` on **both** macOS and Linux (not
+    ``~/Library/Application Support``); on Windows it is ``%APPDATA%\\Zed``.
+    Workspace servers live in ``.zed/settings.json``, resolved per-project by the
+    adapter.
+    """
+    if system == "Windows":
+        appdata = env.get("APPDATA")
+        if not appdata:
+            return []
+        return [PureWindowsPath(appdata) / "Zed" / "settings.json"]
+    home = _home(system, env)  # macOS and Linux both use ~/.config/zed
+    if home is None:
+        return []
+    return [home / ".config" / "zed" / "settings.json"]

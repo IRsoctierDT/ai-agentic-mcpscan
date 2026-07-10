@@ -18,6 +18,7 @@ from collections.abc import Mapping
 from pathlib import Path, PurePath
 
 from .base import HostAdapter, ParsedConfig, parse_named_servers
+from .jsonc import loads_jsonc
 from .paths import vscode_config_candidates
 
 
@@ -34,7 +35,8 @@ class VSCodeAdapter(HostAdapter):
 
     def parse(self, path: str, raw: str) -> ParsedConfig:
         try:
-            data = json.loads(raw)
+            # mcp.json is JSONC (VS Code allows comments + trailing commas).
+            data = loads_jsonc(raw)
         except (json.JSONDecodeError, ValueError) as exc:
             return ParsedConfig(path=path, parse_error=f"invalid JSON: {exc}")
 
