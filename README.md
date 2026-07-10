@@ -80,6 +80,8 @@ mcpscan scan --show-secrets           # reveal masked (first-2/last-2) values
 mcpscan scan --absolute-paths         # show full paths instead of ~
 mcpscan scan --fix                    # apply safe tool-scope fixes (backs up first)
 mcpscan inventory                     # classified AI/MCP asset list (see below)
+mcpscan atlas                         # findings mapped to security frameworks
+mcpscan atlas --matrix                # the full check-id -> framework matrix
 mcpscan lan  --manifest auth.toml ... # authorized network assessment (see below)
 ```
 
@@ -161,6 +163,32 @@ the trust boundary — loopback-only bare GETs (`--no-probe` disables even that)
 response bodies are treated as hostile and never reach the output. Unrecognized
 services are deliberately *not* listed: a plain web server is `scan`'s exposure
 concern, not an AI asset.
+
+### Framework mapping (`mcpscan atlas`)
+
+`atlas` renders the same findings `scan` produces, each annotated with its
+security-framework citations — **MITRE ATT&CK**, **MITRE ATLAS**, **OWASP LLM
+Top 10**, **NIST AI RMF** (function level), and **CIS Controls v8** (control
+level) — so a finding drops straight into an assessment report or a GRC tool.
+
+```
+$ mcpscan atlas
+  [CRITICAL] CRED-PLAINTEXT: Plaintext High-entropy secret in config
+             ↳ MITRE ATT&CK T1552.001 — Unsecured Credentials: Credentials In Files
+             ↳ MITRE ATLAS AML.T0055 — Unsecured Credentials
+             ↳ OWASP LLM Top 10 LLM02 — Sensitive Information Disclosure
+             ↳ NIST AI RMF GOVERN — Govern function
+             ↳ CIS Controls v8 Control 3 — Data Protection
+```
+
+`--matrix` prints the full static check-id → framework table without scanning;
+`--json` emits mapped findings plus the matrix. The mapping table is
+deliberately conservative — a citation appears only where the technique/control
+match is direct, NIST AI RMF stays at function level and CIS at control level —
+and it lives in one auditable data file
+([`src/mcpscan/atlas/model.py`](src/mcpscan/atlas/model.py)), with CI gating
+that every check id the scanner can emit has a mapping and no mapping outlives
+its check. Exit-code semantics match `scan` (`--fail-on`).
 
 ### GitHub code scanning (SARIF)
 
@@ -251,11 +279,12 @@ From 1.0, the CLI surface, JSON report schema, and check ids are covered by
 semver: breaking changes to any of them mean a major version bump.
 
 Roadmap for 1.x, tracking the platform tiers in
-[docs/proposals/VISION.md](docs/proposals/VISION.md): **`inventory` (Tier 1) has
-landed** — a classified AI/MCP asset list. Next: `atlas` (Tier 2 — findings
-mapped to MITRE ATT&CK/ATLAS, OWASP MCP Top 10, NIST AI RMF), SARIF logical
-locations for non-file (`lan`) findings, and real-lab dogfooding (stakeholder
-configs + a pfSense/Suricata network lab for the socket and `lan` surfaces).
+[docs/proposals/VISION.md](docs/proposals/VISION.md): **`inventory` (Tier 1) and
+`atlas` (Tier 2) have landed** — a classified AI/MCP asset list, and findings
+mapped to MITRE ATT&CK/ATLAS, OWASP LLM Top 10, NIST AI RMF, and CIS v8. Next:
+SARIF logical locations for non-file (`lan`) findings, and real-lab dogfooding
+(stakeholder configs + a pfSense/Suricata network lab for the socket and `lan`
+surfaces).
 
 ## License
 
