@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v1.0.0...ai-agentic-mcpscan-v1.1.0) (2026-07-10)
+
+
+### Features
+
+* **inventory:** add Tier-1 AI/MCP asset inventory command ([#49](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/49)) ([0fe0f9f](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/0fe0f9fadddfd5d885215ba19150257ef9211309))
+
 ## [1.0.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.10.0...ai-agentic-mcpscan-v1.0.0) (2026-07-10)
 
 
