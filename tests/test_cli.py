@@ -70,6 +70,24 @@ def test_writes_json_and_html_reports(
     assert "wrote HTML report" in err
 
 
+def test_writes_sarif_report(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    make_report: Callable[..., Report],
+    make_finding: Callable[..., Finding],
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: make_report(make_finding()))
+    sarif_path = tmp_path / "results.sarif"
+    # A critical finding still writes SARIF before the non-zero exit.
+    rc = main(["scan", "--sarif", str(sarif_path), "--fail-on", "critical"])
+    assert rc == 1
+    doc = json.loads(sarif_path.read_text(encoding="utf-8"))
+    assert doc["version"] == "2.1.0"
+    assert doc["runs"][0]["results"], "expected at least one SARIF result"
+    assert "wrote SARIF report" in capsys.readouterr().err
+
+
 def test_show_secrets_emits_warning(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

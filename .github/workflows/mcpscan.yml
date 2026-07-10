@@ -1,0 +1,49 @@
+name: MCPscan (code scanning)
+
+# Dogfood: run mcpscan against its own checkout and upload the SARIF to GitHub
+# code scanning. Findings surface as code-scanning alerts on the Security tab
+# rather than gating merges here, so the scan step never fails the job.
+#
+# Guarded to public repositories because SARIF upload requires GitHub Advanced
+# Security (free on public repos; a paid add-on on private ones).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: scan & upload SARIF
+    runs-on: ubuntu-latest
+    if: github.event.repository.visibility == 'public'
+    permissions:
+      contents: read
+      security-events: write # required to upload SARIF to code scanning
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install mcpscan (from source)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+
+      - name: Scan and emit SARIF
+        # Advise-only here: never fail the job on a finding — the SARIF upload
+        # is what surfaces results. --fail-on critical keeps a hard signal in
+        # the logs while continue-on-error lets the upload step always run.
+        continue-on-error: true
+        run: mcpscan scan --sarif results.sarif --fail-on critical
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+          category: mcpscan

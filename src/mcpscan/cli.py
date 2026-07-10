@@ -50,6 +50,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", metavar="PATH", type=Path, help="Write a JSON report.")
     parser.add_argument("--html", metavar="PATH", type=Path, help="Write an HTML report.")
     parser.add_argument(
+        "--sarif",
+        metavar="PATH",
+        type=Path,
+        help="Write a SARIF 2.1.0 report for GitHub code scanning.",
+    )
+    parser.add_argument(
         "--show-secrets",
         action="store_true",
         help="Reveal masked (first-2/last-2) secret values. Off by default.",
@@ -90,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     from .report import RenderOptions
     from .report.html import render_html
     from .report.json_report import render_json
+    from .report.sarif import render_sarif
     from .report.terminal import render_terminal
     from .report.writer import write_report
 
@@ -126,6 +133,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.html is not None:
         write_report(args.html, render_html(report, opts))
         print(f"wrote HTML report: {args.html}", file=sys.stderr)
+    if args.sarif is not None:
+        # Relativize repo-local paths to cwd so GitHub code scanning can map them.
+        write_report(args.sarif, render_sarif(report, opts, base=str(Path.cwd())))
+        print(f"wrote SARIF report: {args.sarif}", file=sys.stderr)
 
     return _exit_code(report, args.fail_on)
 
