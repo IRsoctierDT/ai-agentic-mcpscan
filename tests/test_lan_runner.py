@@ -120,8 +120,16 @@ def test_verify_ed25519_bad_base64_signature(tmp_path: Path) -> None:
 def test_verify_ed25519_without_crypto_extra(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Simulate the [crypto] extra being absent: the cryptography import fails.
-    monkeypatch.setitem(sys.modules, "cryptography", None)
+    # Simulate the [crypto] extra being absent. Setting the parent alone is not
+    # enough when the submodules are already cached in sys.modules (as they are
+    # after the real-crypto tests run in CI) — the from-import would still
+    # resolve. Setting each imported submodule to None forces ImportError.
+    for module in (
+        "cryptography",
+        "cryptography.exceptions",
+        "cryptography.hazmat.primitives.asymmetric.ed25519",
+    ):
+        monkeypatch.setitem(sys.modules, module, None)
     r = verify_ed25519(b"data", tmp_path / "s", tmp_path / "a", "op")
     assert not r.ok and "crypto" in r.detail
 
