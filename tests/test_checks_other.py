@@ -80,6 +80,13 @@ def test_non_runner_command_clean() -> None:
     assert check_server_pinning(s, "/cfg.json") == []
 
 
+def test_runner_with_only_flags_has_no_package_to_flag() -> None:
+    # A floating runner (npx) invoked with only option flags names no package,
+    # so there is nothing to pin and the check stays silent.
+    s = ServerDecl(name="x", command="npx", args=("-y",))
+    assert check_server_pinning(s, "/cfg.json") == []
+
+
 # --- scoring ---
 def test_scoring_rubric_bands() -> None:
     assert grade_for_score(100) == "A"
