@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.8.0...ai-agentic-mcpscan-v0.9.0) (2026-07-10)
+
+
+### Features
+
+* **lan:** wire the mcpscan lan command on the safety core ([#40](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/40)) ([44da233](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/44da233cd858fb69faa9864be36dbc5408cd5549))
+
 ## [0.8.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.7.0...ai-agentic-mcpscan-v0.8.0) (2026-07-10)
 
 
