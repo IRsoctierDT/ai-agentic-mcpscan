@@ -268,3 +268,38 @@ def test_vscode_user_level_config_is_discovered(tmp_path: Path) -> None:
     report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
     ids = {f.id for s in report.servers for f in s.findings}
     assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
+
+
+# --- Zed host adapter (native MCP, "context_servers" shape, JSONC) ---
+ZED_VULN = {
+    "context_servers": {
+        "leaky": {
+            "command": "npx",
+            "args": ["-y", "db-mcp-server"],
+            "env": {"POSTGRES_PASSWORD": "S3cr3t-Pa55w0rd-abcdef123456"},
+        }
+    }
+}
+
+
+def test_zed_project_config_is_discovered(tmp_path: Path) -> None:
+    zed_dir = tmp_path / ".zed"
+    zed_dir.mkdir()
+    (zed_dir / "settings.json").write_text(json.dumps(ZED_VULN), encoding="utf-8")
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
+    leaky = [s for s in report.servers if s.id.endswith("#leaky")]
+    assert len(leaky) == 1
+    assert "settings.json" in leaky[0].id and ".zed" in leaky[0].id
+    ids = {f.id for f in leaky[0].findings}
+    assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
+
+
+def test_zed_user_level_jsonc_config_is_discovered(tmp_path: Path) -> None:
+    # User settings at ~/.config/zed/settings.json, written as JSONC (comments).
+    zed_dir = tmp_path / ".config" / "zed"
+    zed_dir.mkdir(parents=True)
+    body = "{\n  // my servers\n  " + json.dumps(ZED_VULN)[1:-1] + ",\n}"
+    (zed_dir / "settings.json").write_text(body, encoding="utf-8")
+    report = scan(roots=[], system="Darwin", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
+    ids = {f.id for s in report.servers for f in s.findings}
+    assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids

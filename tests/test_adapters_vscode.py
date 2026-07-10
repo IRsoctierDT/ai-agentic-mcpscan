@@ -39,6 +39,21 @@ def test_http_server_without_command_is_tolerated() -> None:
     assert cfg.servers[0].command is None
 
 
+def test_parses_jsonc_with_comments() -> None:
+    # mcp.json is JSONC — a config with comments + a trailing comma must parse.
+    raw = """
+    {
+      // project MCP servers
+      "servers": {
+        "svc": { "command": "node", "args": ["s.js"], },
+      },
+    }
+    """
+    cfg = VSCodeAdapter().parse("/w/.vscode/mcp.json", raw)
+    assert cfg.parse_error is None
+    assert [s.name for s in cfg.servers] == ["svc"]
+
+
 def test_never_raises_on_bad_json() -> None:
     cfg = VSCodeAdapter().parse("/w/.vscode/mcp.json", "{nope")
     assert cfg.parse_error is not None
