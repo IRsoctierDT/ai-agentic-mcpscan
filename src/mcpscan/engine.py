@@ -48,6 +48,43 @@ SCHEMA_VERSION = "1.0"
 OsvFetch = Callable[[str, str, str], "tuple[tuple[str, ...], bool]"]
 
 
+def _adapters() -> tuple[HostAdapter, ...]:
+    """The registered host adapters (ADR-4), in discovery priority order."""
+    return (ClaudeAdapter(), CursorAdapter(), WindsurfAdapter(), ClineAdapter())
+
+
+def discover_host_config_files(
+    *,
+    roots: Sequence[Path] | None = None,
+    system: str | None = None,
+    env: Mapping[str, str] | None = None,
+) -> list[Path]:
+    """Return the existing host-config files a scan would read (user + project).
+
+    Deduped, order-stable, host-config only (no ``.env``). Used by ``--fix`` so
+    remediation targets exactly the files the scan audited.
+    """
+    system = system or platform.system()
+    env = env if env is not None else os.environ
+    roots = list(roots) if roots is not None else [Path.cwd()]
+    adapters = _adapters()
+
+    seen: list[Path] = []
+
+    def _add(path: Path) -> None:
+        if path not in seen and path.exists() and path.is_file():
+            seen.append(path)
+
+    for adapter in adapters:
+        for cand in adapter.default_config_paths(system, env):
+            _add(Path(str(cand)))
+    for root in roots:
+        for adapter in adapters:
+            for path in adapter.project_config_paths(root):
+                _add(path)
+    return seen
+
+
 def _audit_config(cfg: ParsedConfig, osv_fetch: OsvFetch | None = None) -> list[Server]:
     servers: list[Server] = []
     for decl in cfg.servers:
@@ -184,12 +221,7 @@ def scan(
     if online:
         fetch = osv_fetch if osv_fetch is not None else _default_osv_fetch
 
-    adapters: tuple[HostAdapter, ...] = (
-        ClaudeAdapter(),
-        CursorAdapter(),
-        WindsurfAdapter(),
-        ClineAdapter(),
-    )
+    adapters = _adapters()
     servers: list[Server] = []
 
     # --- user-level (default) host configs ---

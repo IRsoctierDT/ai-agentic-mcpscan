@@ -32,7 +32,9 @@ command: `mcpscan`. License: Apache-2.0.
   enrichment and says so.
 - **Secrets never leak** — redacted everywhere; `--show-secrets` reveals only a
   masked/partial value, with a warning.
-- **Advise-only** — never writes to your config files.
+- **Advise-only by default** — never writes to your config files unless you pass
+  `--fix`, which applies only safe, reversible tool-scope edits and backs up
+  every file it touches first.
 - **Fully stateless** — writes only the report you explicitly ask for.
 - **Passes its own scan** — exposes no port, ships no plaintext secret.
 
@@ -63,6 +65,7 @@ mcpscan scan --fail-on critical       # CI: exit non-zero only on Critical
 mcpscan scan --online                 # opt-in OSV enrichment (discloses egress)
 mcpscan scan --show-secrets           # reveal masked (first-2/last-2) values
 mcpscan scan --absolute-paths         # show full paths instead of ~
+mcpscan scan --fix                    # apply safe tool-scope fixes (backs up first)
 ```
 
 Exit code is non-zero when a finding meets `--fail-on` (default: `high`), so it
@@ -83,6 +86,29 @@ AI Agentic MCPscan — overall posture: F
                     secret manager … and rotate the exposed credential.
   [MEDIUM  ] Server 'weather' runs an unpinned package via npx
              fix:   Pin the package to an exact version (e.g. npx some-pkg@1.2.3).
+```
+
+### Fixing findings (`--fix`)
+
+The tool is advise-only by default. `--fix` is the one explicit exception that
+writes to your configs, and it stays deliberately conservative:
+
+- **Scope:** removes over-broad **tool-scope** grants only — dangerous
+  (shell/exec-class) and wildcard entries from `permissions.allow` and each
+  server's `autoApprove`, using the exact predicates the scanner flags with, so
+  a fixed config re-scans clean.
+- **Reversible:** every modified file is copied to `<path>.mcpscan.bak` before
+  the edit, and the file's permissions are preserved.
+- **Nothing invented:** credential and pinning findings are **not** auto-fixed —
+  a safe rewrite would need a new home for the secret or a specific version the
+  tool can't know offline, so those stay manual (the report tells you what to do).
+
+```
+$ mcpscan scan --root . --fix
+note: --fix modifies config files in place (backup written to <path>.mcpscan.bak) …
+fixed ./.mcp.json (1 change(s); backup: ./.mcp.json.mcpscan.bak)
+    removed 'Bash(*)' from permissions.allow [SCOPE-DANGEROUS-ALLOW]
+applied 1 fix(es). Re-run mcpscan to confirm.
 ```
 
 ### GitHub code scanning (SARIF)
@@ -132,9 +158,9 @@ pytest on macOS/Linux/Windows × Python 3.11–3.13), with SBOM + checksums on e
 release. It's **Beta**: safe to run, but the CLI surface and check heuristics may
 still change before `v1.0.0`.
 
-Roadmap toward 1.0: real-world dogfooding, more host adapters, opt-in `--fix`,
-and authorized-LAN scanning behind an explicit gate. **Done:** SARIF 2.1.0
-output + a GitHub code-scanning workflow.
+Roadmap toward 1.0: real-world dogfooding, more host adapters, and authorized-LAN
+scanning behind an explicit gate. **Done:** SARIF 2.1.0 output + a GitHub
+code-scanning workflow, and opt-in `--fix` for over-broad tool scopes.
 
 ## License
 

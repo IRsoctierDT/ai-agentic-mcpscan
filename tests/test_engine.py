@@ -11,7 +11,7 @@ import mcpscan.engine as engine_mod
 from mcpscan.adapters.claude import ClaudeAdapter
 from mcpscan.discovery.sockets import EnumerationResult, ListeningSocket
 from mcpscan.domain import Dimension, ServerState
-from mcpscan.engine import scan
+from mcpscan.engine import discover_host_config_files, scan
 
 VULN_CONFIG = {
     "mcpServers": {
@@ -196,6 +196,26 @@ def test_windsurf_user_level_config_is_discovered(tmp_path: Path) -> None:
     report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
     ids = {f.id for s in report.servers for f in s.findings}
     assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
+
+
+def test_discover_host_config_files_finds_project_and_user_configs(tmp_path: Path) -> None:
+    # Project .mcp.json + .cursor/mcp.json, plus a user-level Cursor config.
+    (tmp_path / ".mcp.json").write_text(json.dumps(CLEAN_CONFIG), encoding="utf-8")
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".cursor" / "mcp.json").write_text(json.dumps(CURSOR_VULN), encoding="utf-8")
+    files = discover_host_config_files(
+        roots=[tmp_path], system="Linux", env={"HOME": str(tmp_path)}
+    )
+    names = {p.name for p in files}
+    assert "mcp.json" in names and ".mcp.json" in names
+    # No duplicates, and .env is never included (host configs only).
+    assert len(files) == len(set(files))
+    assert not any(p.name == ".env" for p in files)
+
+
+def test_discover_host_config_files_skips_missing(tmp_path: Path) -> None:
+    # Nothing on disk -> empty list, never a crash.
+    assert discover_host_config_files(roots=[tmp_path], system="Linux", env={}) == []
 
 
 def test_cline_user_level_config_is_discovered(tmp_path: Path) -> None:
