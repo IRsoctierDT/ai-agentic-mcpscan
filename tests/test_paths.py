@@ -7,6 +7,7 @@ from pathlib import PureWindowsPath
 from mcpscan.adapters.paths import (
     claude_config_candidates,
     cline_config_candidates,
+    continue_config_candidates,
     cursor_config_candidates,
     vscode_config_candidates,
     windsurf_config_candidates,
@@ -155,6 +156,22 @@ def test_zed_windows_without_appdata_yields_no_paths() -> None:
 
 def test_zed_missing_home_yields_no_paths() -> None:
     assert zed_config_candidates("Linux", {}) == []
+
+
+def test_continue_paths_posix() -> None:
+    for system, home in (("Darwin", "/Users/jane"), ("Linux", "/home/jane")):
+        paths = [str(p) for p in continue_config_candidates(system, {"HOME": home})]
+        assert paths == [f"{home}/.continue/config.yaml"]
+
+
+def test_continue_paths_windows() -> None:
+    cands = continue_config_candidates("Windows", {"USERPROFILE": r"C:\Users\jane"})
+    assert any(isinstance(p, PureWindowsPath) for p in cands)
+    assert any(str(p).endswith(r"\.continue\config.yaml") for p in cands)
+
+
+def test_continue_missing_home_yields_no_paths() -> None:
+    assert continue_config_candidates("Linux", {}) == []
 
 
 def test_windows_without_appdata_skips_desktop_config() -> None:

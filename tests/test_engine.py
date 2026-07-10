@@ -303,3 +303,36 @@ def test_zed_user_level_jsonc_config_is_discovered(tmp_path: Path) -> None:
     report = scan(roots=[], system="Darwin", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
     ids = {f.id for s in report.servers for f in s.findings}
     assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
+
+
+# --- Continue host adapter (YAML "mcpServers" list; [yaml] extra) ---
+CONTINUE_VULN = """
+name: cfg
+mcpServers:
+  - name: leaky
+    command: npx
+    args: ["-y", "db-mcp-server"]
+    env:
+      POSTGRES_PASSWORD: S3cr3t-Pa55w0rd-abcdef123456
+"""
+
+
+def test_continue_project_config_is_discovered(tmp_path: Path) -> None:
+    cont_dir = tmp_path / ".continue"
+    cont_dir.mkdir()
+    (cont_dir / "config.yaml").write_text(CONTINUE_VULN, encoding="utf-8")
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
+    leaky = [s for s in report.servers if s.id.endswith("#leaky")]
+    assert len(leaky) == 1
+    assert "config.yaml" in leaky[0].id and ".continue" in leaky[0].id
+    ids = {f.id for f in leaky[0].findings}
+    assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
+
+
+def test_continue_user_level_config_is_discovered(tmp_path: Path) -> None:
+    cont_dir = tmp_path / ".continue"
+    cont_dir.mkdir()
+    (cont_dir / "config.yaml").write_text(CONTINUE_VULN, encoding="utf-8")
+    report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
+    ids = {f.id for s in report.servers for f in s.findings}
+    assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids

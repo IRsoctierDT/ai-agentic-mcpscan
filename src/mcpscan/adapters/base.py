@@ -93,6 +93,31 @@ def parse_mcp_servers(data: object) -> tuple[ServerDecl, ...]:
     return parse_named_servers(data, "mcpServers")
 
 
+def parse_server_list(items: object, *, name_key: str = "name") -> tuple[ServerDecl, ...]:
+    """Extract ``ServerDecl``s from a **list** of server specs (Continue's shape).
+
+    Unlike the ``{name: spec}`` mapping, each list item carries its own name
+    (``name_key``); a missing name falls back to a positional ``server-N``.
+    """
+    servers: list[ServerDecl] = []
+    if isinstance(items, list):
+        for index, spec in enumerate(items):
+            if not isinstance(spec, dict):
+                continue
+            name = spec.get(name_key)
+            command = spec.get("command")
+            servers.append(
+                ServerDecl(
+                    name=str(name) if name is not None else f"server-{index}",
+                    command=str(command) if command is not None else None,
+                    args=coerce_args(spec.get("args")),
+                    env=coerce_env(spec.get("env")),
+                    auto_approve=coerce_str_list(spec.get("autoApprove")),
+                )
+            )
+    return tuple(servers)
+
+
 class HostAdapter(ABC):
     """Base class for host-specific config discovery and parsing."""
 

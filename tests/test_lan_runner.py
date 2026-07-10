@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import base64
 import http.server
 import socket
+import sys
 import threading
 import types
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 import mcpscan.lan.verify as verify_mod
 from mcpscan.domain import Dimension
 from mcpscan.lan.probe import ProbeResult, tcp_probe
 from mcpscan.lan.runner import LanOutcome, LanRefusal, run_lan
-from mcpscan.lan.verify import VerifyResult, verify_manifest, verify_ssh
+from mcpscan.lan.verify import VerifyResult, verify_ed25519, verify_manifest, verify_ssh
 
 MANIFEST = b"""
 authorization_id = "ENG-2026-0710"
@@ -52,16 +56,96 @@ def _run(**over: object) -> LanOutcome | LanRefusal:
     return run_lan(**kw)  # type: ignore[arg-type]
 
 
-# --- verify ---
-def test_verify_manifest_ed25519_needs_extra() -> None:
+# --- verify: ed25519 ([crypto] extra) ---
+def _crypto_backend_works() -> bool:
+    # Some environments ship a cryptography whose native backend can't load; the
+    # key ops raise/panic rather than ImportError. Detect and skip those.
+    try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        Ed25519PrivateKey.generate().sign(b"x")
+    except BaseException:  # noqa: BLE001 - includes pyo3 PanicException on broken backends
+        return False
+    return True
+
+
+_CRYPTO_OK = _crypto_backend_works()
+_needs_crypto = pytest.mark.skipif(not _CRYPTO_OK, reason="cryptography backend unavailable")
+
+
+def _ed25519_material(tmp_path: Path, data: bytes, operator: str = "op@example.com"):  # type: ignore[no-untyped-def]
+    """Generate a keypair, sign ``data``, and write sig + allowed-signers files."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    key = Ed25519PrivateKey.generate()
+    pub_raw = key.public_key().public_bytes_raw()
+    sig = key.sign(data)
+    sig_path = tmp_path / "auth.sig"
+    sig_path.write_bytes(base64.b64encode(sig))
+    signers = tmp_path / "allowed"
+    signers.write_text(f"{operator} {base64.b64encode(pub_raw).decode()}\n", encoding="utf-8")
+    return sig_path, signers
+
+
+@_needs_crypto
+def test_verify_ed25519_success(tmp_path: Path) -> None:
+    data = b"the manifest bytes"
+    sig, signers = _ed25519_material(tmp_path, data)
+    assert verify_ed25519(data, sig, signers, "op@example.com").ok
+
+
+@_needs_crypto
+def test_verify_ed25519_tampered_is_rejected(tmp_path: Path) -> None:
+    sig, signers = _ed25519_material(tmp_path, b"original")
+    r = verify_ed25519(b"tampered", sig, signers, "op@example.com")
+    assert not r.ok and "verification failed" in r.detail
+
+
+@_needs_crypto
+def test_verify_ed25519_unknown_operator(tmp_path: Path) -> None:
+    sig, signers = _ed25519_material(tmp_path, b"data")
+    r = verify_ed25519(b"data", sig, signers, "someone-else@example.com")
+    assert not r.ok and "no ed25519 public key" in r.detail
+
+
+@_needs_crypto
+def test_verify_ed25519_bad_base64_signature(tmp_path: Path) -> None:
+    _sig, signers = _ed25519_material(tmp_path, b"data")
+    bad = tmp_path / "bad.sig"
+    bad.write_bytes(b"!!!not base64!!!")
+    r = verify_ed25519(b"data", bad, signers, "op@example.com")
+    assert not r.ok and "not valid base64" in r.detail
+
+
+def test_verify_ed25519_without_crypto_extra(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Simulate the [crypto] extra being absent. Setting the parent alone is not
+    # enough when the submodules are already cached in sys.modules (as they are
+    # after the real-crypto tests run in CI) — the from-import would still
+    # resolve. Setting each imported submodule to None forces ImportError.
+    for module in (
+        "cryptography",
+        "cryptography.exceptions",
+        "cryptography.hazmat.primitives.asymmetric.ed25519",
+    ):
+        monkeypatch.setitem(sys.modules, module, None)
+    r = verify_ed25519(b"data", tmp_path / "s", tmp_path / "a", "op")
+    assert not r.ok and "crypto" in r.detail
+
+
+@_needs_crypto
+def test_verify_manifest_dispatches_ed25519(tmp_path: Path) -> None:
+    data = b"manifest"
+    sig, signers = _ed25519_material(tmp_path, data)
     r = verify_manifest(
         scheme="ed25519",
-        manifest_bytes=b"x",
-        signature_path=Path("s"),
-        allowed_signers=Path("a"),
-        operator="op",
+        manifest_bytes=data,
+        signature_path=sig,
+        allowed_signers=signers,
+        operator="op@example.com",
     )
-    assert not r.ok and "crypto" in r.detail
+    assert r.ok
 
 
 def test_verify_manifest_ssh_requires_files() -> None:
