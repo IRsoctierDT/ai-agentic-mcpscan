@@ -229,6 +229,13 @@ def main(argv: list[str] | None = None) -> int:
     text = args.config.read_text(encoding="utf-8")
     scrubbed, report = anonymize(args.host, text)
 
+    # Redaction-safe by construction: `anonymize` replaces every scanner-detected
+    # secret and every provider-shaped token, and fails closed (LeakError) rather
+    # than return text a provider secret survived — so `scrubbed` cannot carry one
+    # to this sink, and `report` holds only counts/category labels. CodeQL
+    # py/clear-text-logging-sensitive-data flags these prints because it can't
+    # model that sanitizer as a barrier — accepted false positive, dismissed in
+    # code scanning (mirrors the documented case in src/mcpscan/cli.py).
     print("# --- anonymized config ---")
     print(scrubbed)
     print("# --- report (no sensitive values) ---", file=sys.stderr)
