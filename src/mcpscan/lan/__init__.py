@@ -19,14 +19,21 @@ from __future__ import annotations
 
 from .budgets import Budgets, budgets_for_invoker
 from .manifest import Manifest, ManifestError, load_manifest
+from .runner import LanOutcome, LanRefusal, run_lan
 from .scope import ScopeError, resolve_scope
+from .verify import VerifyResult, verify_manifest
 
 __all__ = [
     "Budgets",
+    "LanOutcome",
+    "LanRefusal",
     "Manifest",
     "ManifestError",
     "ScopeError",
+    "VerifyResult",
     "budgets_for_invoker",
     "load_manifest",
     "resolve_scope",
+    "run_lan",
+    "verify_manifest",
 ]

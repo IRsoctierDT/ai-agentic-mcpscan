@@ -67,6 +67,7 @@ mcpscan scan --online                 # opt-in OSV enrichment (discloses egress)
 mcpscan scan --show-secrets           # reveal masked (first-2/last-2) values
 mcpscan scan --absolute-paths         # show full paths instead of ~
 mcpscan scan --fix                    # apply safe tool-scope fixes (backs up first)
+mcpscan lan  --manifest auth.toml ... # authorized network assessment (see below)
 ```
 
 Exit code is non-zero when a finding meets `--fail-on` (default: `high`), so it
@@ -139,6 +140,37 @@ steps:
 
 This repo dogfoods it in [`.github/workflows/mcpscan.yml`](.github/workflows/mcpscan.yml).
 
+### Authorized network assessment (`mcpscan lan`)
+
+`mcpscan scan` is localhost-only. `mcpscan lan` is a **separate, gated** command
+for assessing MCP exposure on hosts **you are authorized to test** — and it is
+**inert without a signed authorization manifest**. Governing principle:
+*discovery never converts into authority.* It is exposure-only (never reads a
+remote config), private-address by default, and bounded by immutable budgets.
+
+```bash
+mcpscan lan --manifest auth.toml \
+            --signature auth.toml.sig \
+            --allowed-signers allowed_signers \
+            --invoker human \
+            --dry-run            # verify + print the plan; send no packets
+```
+
+The manifest is a signed TOML file naming exact targets, ports, operator, and
+expiry:
+
+```toml
+authorization_id = "ENG-2026-0710"
+operator         = "you@example.com"
+expires_at       = "2026-07-10T23:59:59Z"
+targets          = ["192.168.10.20/32"]   # exact hosts / /32 (a human may use a capped CIDR)
+ports            = [3000, 8000]
+```
+
+Sign it with your SSH key (`ssh-keygen -Y sign -n mcpscan-lan -f key auth.toml`).
+`--invoker agent` gets tighter budgets and exact-hosts-only. Full design,
+threat model, and roadmap: [`docs/proposals/LAN_SCANNING.md`](docs/proposals/LAN_SCANNING.md).
+
 ## Documentation
 
 | Doc | What it is |
@@ -159,9 +191,11 @@ pytest on macOS/Linux/Windows × Python 3.11–3.13), with SBOM + checksums on e
 release. It's **Beta**: safe to run, but the CLI surface and check heuristics may
 still change before `v1.0.0`.
 
-Roadmap toward 1.0: real-world dogfooding, more host adapters, and authorized-LAN
-scanning behind an explicit gate. **Done:** SARIF 2.1.0 output + a GitHub
-code-scanning workflow, and opt-in `--fix` for over-broad tool scopes.
+Roadmap toward 1.0: real-world dogfooding and more host adapters. **Done:** SARIF
+2.1.0 output + a GitHub code-scanning workflow, opt-in `--fix` for over-broad
+tool scopes, six host adapters (Claude, Cursor, Windsurf, Cline, VS Code, Zed),
+and `mcpscan lan` — authorized, exposure-only network assessment behind a signed
+manifest.
 
 ## License
 

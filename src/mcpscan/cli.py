@@ -6,11 +6,15 @@ Wires the scan engine to the renderers. Honors the spec's trust properties:
 offline by default, secrets redacted unless ``--show-secrets``, and — advise-only
 by default — the only file writes are the reports the user explicitly requests
 (``--json`` / ``--html`` / ``--sarif``) plus the config edits of opt-in ``--fix``.
+
+Two commands: ``scan`` (localhost, the default surface) and ``lan`` (authorized
+network assessment — inert without a signed manifest; see ``mcpscan.lan``).
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -38,8 +42,8 @@ def build_parser() -> argparse.ArgumentParser:
         "command",
         nargs="?",
         default=None,
-        choices=["scan"],
-        help="The action to run (only 'scan' is available in the MVP).",
+        choices=["scan", "lan"],
+        help="The action to run: 'scan' (localhost) or 'lan' (authorized network assessment).",
     )
     parser.add_argument(
         "--root",
@@ -90,6 +94,40 @@ def build_parser() -> argparse.ArgumentParser:
             "(the tool is advise-only unless you pass --fix)."
         ),
     )
+
+    lan = parser.add_argument_group(
+        "lan", "Authorized network assessment (used only with the 'lan' command)."
+    )
+    lan.add_argument(
+        "--manifest", metavar="PATH", type=Path, help="Signed TOML authorization manifest."
+    )
+    lan.add_argument(
+        "--signature",
+        metavar="PATH",
+        type=Path,
+        help="Detached signature over the manifest (default: <manifest>.sig).",
+    )
+    lan.add_argument(
+        "--allowed-signers",
+        metavar="PATH",
+        type=Path,
+        help="OpenSSH allowed-signers file for the 'ssh' scheme.",
+    )
+    lan.add_argument(
+        "--invoker",
+        choices=("human", "agent"),
+        help="Invocation mode. 'agent' gets tighter budgets and exact-host-only scope.",
+    )
+    lan.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="lan: verify the manifest and print the target plan without sending any packet.",
+    )
+    lan.add_argument(
+        "--allow-public",
+        action="store_true",
+        help="lan: permit public (non-private) targets. Requires explicit authorization.",
+    )
     return parser
 
 
@@ -102,6 +140,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
+    if args.command == "lan":
+        return _run_lan(args)
+    return _run_scan(args)
+
+
+def _run_scan(args: argparse.Namespace) -> int:
+    """The localhost scan command (default)."""
     # Imported lazily so the default/help path stays light and import-isolated.
     from .engine import scan
     from .report import RenderOptions
@@ -153,6 +198,75 @@ def main(argv: list[str] | None = None) -> int:
         _apply_fixes(args.root, opts)
 
     return _exit_code(report, args.fail_on)
+
+
+def _run_lan(args: argparse.Namespace) -> int:
+    """The authorized network-assessment command ('lan')."""
+    from datetime import datetime, timezone
+
+    from . import __version__
+    from .lan import LanRefusal, run_lan
+    from .lan.audit import audit_record_to_dict
+    from .report import RenderOptions
+    from .report.json_report import report_to_dict
+    from .report.terminal import render_terminal
+    from .report.writer import write_report
+
+    if args.manifest is None or args.invoker is None:
+        print("error: 'lan' requires --manifest and --invoker {human,agent}", file=sys.stderr)
+        return 2
+    try:
+        manifest_bytes = args.manifest.read_bytes()
+    except OSError as exc:
+        print(f"error: cannot read manifest {args.manifest}: {exc}", file=sys.stderr)
+        return 2
+
+    signature = args.signature or Path(str(args.manifest) + ".sig")
+    print(
+        "note: 'lan' probes the authorized targets in the manifest (TCP connect + a "
+        "bare MCP handshake). It is exposure-only and never reads a remote config.",
+        file=sys.stderr,
+    )
+
+    outcome = run_lan(
+        manifest_bytes=manifest_bytes,
+        now=datetime.now(timezone.utc),
+        invoker=args.invoker,
+        tool_version=__version__,
+        argv=sys.argv,
+        signature_path=signature,
+        allowed_signers=args.allowed_signers,
+        allow_public=args.allow_public,
+        dry_run=args.dry_run,
+    )
+    if isinstance(outcome, LanRefusal):
+        print(f"refused: {outcome.reason}", file=sys.stderr)
+        return 2
+
+    audit = outcome.audit
+    print(
+        f"authorized run {audit.authorization_id} (operator {audit.operator}); "
+        f"manifest sha256:{audit.manifest_sha256[:12]}",
+        file=sys.stderr,
+    )
+    opts = RenderOptions(absolute_paths=args.absolute_paths, home=str(Path.home()))
+    if outcome.dry_run:
+        plan = f"{len(outcome.plan_hosts)} host(s) × {len(outcome.plan_ports)} port(s)"
+        print(f"[dry-run] verified plan: {plan}; no packets sent.", file=sys.stderr)
+        for host in outcome.plan_hosts:
+            print(f"  would probe {host} on ports {list(outcome.plan_ports)}", file=sys.stderr)
+    else:
+        print(render_terminal(outcome.report, opts), end="")
+
+    if args.json is not None:
+        payload = {
+            "audit": audit_record_to_dict(audit),
+            "report": report_to_dict(outcome.report, opts),
+        }
+        write_report(args.json, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        print(f"wrote LAN JSON report: {args.json}", file=sys.stderr)
+
+    return _exit_code(outcome.report, args.fail_on)
 
 
 def _apply_fixes(roots: list[Path] | None, opts: object) -> None:
