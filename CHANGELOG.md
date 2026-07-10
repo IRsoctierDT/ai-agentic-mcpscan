@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.10.0...ai-agentic-mcpscan-v1.0.0) (2026-07-10)
+
+
+### Miscellaneous Chores
+
+* declare the scanner stable for the 1.0 release ([#47](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/47)) ([4c8f28c](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/4c8f28c3cf0f6a6cbe6077bbeae9a9e38e39fa56))
+
 ## [0.10.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.9.0...ai-agentic-mcpscan-v0.10.0) (2026-07-10)
 
 
