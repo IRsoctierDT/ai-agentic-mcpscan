@@ -161,3 +161,51 @@ def test_emitted_fixture_is_self_consistent() -> None:
     probe = Fixture("claude", "messy", "project", ".mcp.json", scrubbed)
     actual = evaluate(probe).actual & set(CHECK_IDS)
     assert "CRED-PLAINTEXT" in actual and "PIN-UNPINNED" in actual
+
+
+# --- Phase-2 hardening: provider sweep everywhere + fail-closed guard ---
+def test_provider_secret_in_args_is_swept() -> None:
+    # A key hiding in args (not env) is NOT found by the structured pass, but the
+    # provider sweep must still scrub it — nothing provider-shaped may survive.
+    real = "sk-ant-api03-REALkeyMaterialInArgs1234567890"
+    cfg = json.dumps({"mcpServers": {"x": {"command": "node", "args": ["--token", real]}}})
+    scrubbed, report = anonymize("claude", cfg)
+    assert real not in scrubbed
+    assert report.secrets_replaced.get("Anthropic API key") == 1
+
+
+def test_env_provider_secret_is_counted_once_not_twice() -> None:
+    # A provider key in env is replaced by pass 1; pass 2 must not re-count its
+    # own synthetic. Exactly one replacement is reported.
+    cfg = json.dumps(
+        {"mcpServers": {"x": {"command": "node", "env": {"ANTHROPIC_API_KEY": _ANTHROPIC}}}}
+    )
+    _, report = anonymize("claude", cfg)
+    assert report.secrets_replaced.get("Anthropic API key") == 1
+
+
+def test_all_provider_synthetics_are_idempotent_under_resweep() -> None:
+    # Every synthetic must itself match its pattern *as a whole*, so a second
+    # anonymize pass changes nothing and never trips the fail-closed guard.
+    from anonymize import _PROVIDER_SYNTHETICS
+
+    for _label, pattern, synthetic in _PROVIDER_SYNTHETICS:
+        m = pattern.search(synthetic)
+        assert m is not None and m.group(0) == synthetic, synthetic
+
+
+def test_fail_closed_guard_raises_on_surviving_token() -> None:
+    from anonymize import LeakError, _assert_no_provider_secret
+
+    with pytest.raises(LeakError, match="survived anonymization"):
+        _assert_no_provider_secret('token = "sk-ant-api03-stillARealLiveKey1234567890"')
+
+
+def test_anonymize_text_is_idempotent() -> None:
+    # Re-running on already-scrubbed output must not corrupt it: the synthetic is
+    # itself detected (that's what keeps the fixture real), so it re-synthesizes
+    # to the same value and the TEXT is stable — no real secret can reappear.
+    once, _ = anonymize("claude", _claude_config(_ANTHROPIC))
+    twice, _ = anonymize("claude", once)
+    assert twice == once
+    assert _ANTHROPIC not in twice

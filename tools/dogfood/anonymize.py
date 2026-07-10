@@ -57,7 +57,9 @@ _PROVIDER_SYNTHETICS: tuple[tuple[str, re.Pattern[str], str], ...] = (
         "github_pat_" + "SYNTHETIC0" * 6,
     ),
     ("AWS access key id", re.compile(r"AKIA[0-9A-Z]{16}"), "AKIA" + "SYNTHETIC00ABCDE1"[:16]),
-    ("Google API key", re.compile(r"AIza[0-9A-Za-z_-]{35}"), "AIza" + "SYNTHETIC0" * 4 + "ABCDE"),
+    # Google's pattern is fixed-length (exactly 35): the synthetic must be 35
+    # chars after "AIza" so a search matches it whole (idempotent under re-sweep).
+    ("Google API key", re.compile(r"AIza[0-9A-Za-z_-]{35}"), "AIza" + "SYNTHETIC0" * 3 + "ABCDE"),
     ("Slack token", re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"), "xoxb-" + "SYNTHETIC0" * 3),
 )
 
@@ -118,15 +120,37 @@ def _secret_values(host: str, text: str) -> dict[str, str]:
     return replacements
 
 
+class LeakError(RuntimeError):
+    """Raised if a provider-shaped secret would survive anonymization.
+
+    Fail closed: rather than risk emitting a real token, the anonymizer refuses.
+    In practice the provider sweep replaces every match, so this never fires — it
+    is the guarantee's backstop, not an expected path.
+    """
+
+
 def anonymize(host: str, text: str) -> tuple[str, AnonymizeReport]:
     """Return ``(scrubbed_text, report)`` for a real config.
 
-    Secret values (per the scanner's own detector) are swapped for same-class
-    synthetics; home paths are genericized. The original text is never returned
-    and the report holds only counts.
+    Scrubbing runs in two passes, then a fail-closed check:
+
+    1. **Structured pass** — every value the scanner's own detector flags in a
+       parsed ``env`` block is swapped for a same-class synthetic (this is the
+       set a scan would report, so the fixture keeps tripping the same check).
+    2. **Provider sweep** — every provider-shaped token (Anthropic/OpenAI/GitHub/
+       AWS/Google/Slack/private-key) is then replaced *anywhere* in the text,
+       not just in ``env`` — so a key hiding in ``args`` or a nonstandard field
+       can't slip through the structured pass.
+    3. **Fail closed** — if any provider pattern still matches, raise
+       :class:`LeakError` instead of returning text that could be printed.
+
+    Home paths are genericized. The original text is never returned and the
+    report holds only counts.
     """
     scrubbed = text
     secrets_by_class: dict[str, int] = {}
+
+    # Pass 1: structured env secrets (keeps the fixture's finding set faithful).
     for value, synthetic in _secret_values(host, text).items():
         label = _looks_secret("token", value) or "High-entropy secret"
         occurrences = scrubbed.count(value)
@@ -134,14 +158,32 @@ def anonymize(host: str, text: str) -> tuple[str, AnonymizeReport]:
             scrubbed = scrubbed.replace(value, synthetic)
             secrets_by_class[label] = secrets_by_class.get(label, 0) + occurrences
 
+    # Pass 2: provider-shaped tokens anywhere in the text (defense in depth).
+    # Count only NET-NEW real tokens — a value pass 1 already replaced is now our
+    # synthetic, which the pattern also matches, so exclude those from the count.
+    for label, pattern, synthetic in _PROVIDER_SYNTHETICS:
+        new_matches = sum(1 for m in pattern.finditer(scrubbed) if m.group(0) != synthetic)
+        if new_matches:
+            scrubbed = pattern.sub(synthetic, scrubbed)
+            secrets_by_class[label] = secrets_by_class.get(label, 0) + new_matches
+
     paths_scrubbed = 0
     for pattern, replacement in _HOME_PATTERNS:
-        scrubbed, n = pattern.subn(replacement, scrubbed)
-        paths_scrubbed += n
+        scrubbed, path_n = pattern.subn(replacement, scrubbed)
+        paths_scrubbed += path_n
 
+    _assert_no_provider_secret(scrubbed)
     return scrubbed, AnonymizeReport(
         secrets_replaced=secrets_by_class, paths_scrubbed=paths_scrubbed
     )
+
+
+def _assert_no_provider_secret(scrubbed: str) -> None:
+    """Fail closed if any provider-shaped token survived the sweep."""
+    for label, pattern, synthetic in _PROVIDER_SYNTHETICS:
+        for match in pattern.finditer(scrubbed):
+            if match.group(0) != synthetic:  # a real token, not our placeholder
+                raise LeakError(f"a {label} survived anonymization; refusing to emit")
 
 
 def suggest_fixture(host: str, label: str, scope: str, relpath: str, scrubbed: str) -> str:
