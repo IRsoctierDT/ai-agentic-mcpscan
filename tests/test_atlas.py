@@ -17,13 +17,17 @@ from mcpscan.domain import Finding, Report
 from mcpscan.report import RenderOptions
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "mcpscan"
+# Findings are constructed only in the checks and the lan runner; other packages
+# (e.g. trust relationships) also use ``id=`` but those are not scanner findings.
+_FINDING_SOURCES = (_SRC / "checks", _SRC / "lan")
 
 
 def _emittable_check_ids() -> set[str]:
     """Every finding id the source tree can emit (the ground truth to cover)."""
     ids: set[str] = set()
-    for path in _SRC.rglob("*.py"):
-        ids.update(re.findall(r'id="([A-Z][A-Z0-9-]+)"', path.read_text(encoding="utf-8")))
+    for source in _FINDING_SOURCES:
+        for path in source.rglob("*.py"):
+            ids.update(re.findall(r'id="([A-Z][A-Z0-9-]+)"', path.read_text(encoding="utf-8")))
     return ids
 
 

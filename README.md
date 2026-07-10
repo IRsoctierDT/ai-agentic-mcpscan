@@ -82,6 +82,8 @@ mcpscan scan --fix                    # apply safe tool-scope fixes (backs up fi
 mcpscan inventory                     # classified AI/MCP asset list (see below)
 mcpscan atlas                         # findings mapped to security frameworks
 mcpscan atlas --matrix                # the full check-id -> framework matrix
+mcpscan trust                         # per-agent Trust Score + risk relationships
+mcpscan trust --min-grade B           # CI: fail if any tool grades below B
 mcpscan lan  --manifest auth.toml ... # authorized network assessment (see below)
 ```
 
@@ -163,6 +165,35 @@ the trust boundary — loopback-only bare GETs (`--no-probe` disables even that)
 response bodies are treated as hostile and never reach the output. Unrecognized
 services are deliberately *not* listed: a plain web server is `scan`'s exposure
 concern, not an AI asset.
+
+### Agent trust analysis (`mcpscan trust`)
+
+Where `scan` grades hygiene, `trust` asks *what each agent tool is trusted to do
+and access* — and, crucially, which **combinations** make it a lateral-movement
+risk. Every MCP server gets a **Trust Score** (0–100) across four factors —
+secret access, tool privilege, autonomy (auto-approval), code provenance — and
+the dangerous factor *combinations* are surfaced as **risk relationships** that
+no single hygiene check sees:
+
+```
+$ mcpscan trust
+▶ 'db' [claude]  Trust 25/100 (grade F)
+    · secret_access: holds 1 credential in its environment (+25 risk)
+    · tool_privilege: auto-approves 1 dangerous tool(s) (+25 risk)
+    · autonomy: auto-approves 1 tool(s) with no human in the loop (+15 risk)
+    · code_provenance: runs an unpinned / remotely-fetched package (+10 risk)
+    ⚠ PRIVILEGED-SECRET-HOLDER — a single compromise leaks the secrets and the
+      power to use them.
+    ⚠ AUTONOMOUS-PRIVILEGED — dangerous tools auto-approved, no human in the loop.
+```
+
+The relationships are the differentiator: `PRIVILEGED-SECRET-HOLDER` (secrets +
+dangerous tools), `AUTONOMOUS-PRIVILEGED` (auto-approves dangerous tools),
+`AUTONOMOUS-SECRET-HOLDER`, and `UNVETTED-PRIVILEGED` (unpinned code + dangerous
+tools). Scoring reuses the exact predicates `scan` trusts, so the two never
+diverge. `--min-grade` makes it a CI gate; `--json` emits the full analysis; a
+profile is **secretless** (a credential count, never a value). Read-only and
+offline.
 
 ### Framework mapping (`mcpscan atlas`)
 
@@ -285,12 +316,14 @@ From 1.0, the CLI surface, JSON report schema, and check ids are covered by
 semver: breaking changes to any of them mean a major version bump.
 
 Roadmap for 1.x, tracking the platform tiers in
-[docs/proposals/VISION.md](docs/proposals/VISION.md): **`inventory` (Tier 1) and
-`atlas` (Tier 2) have landed** — a classified AI/MCP asset list, and findings
-mapped to MITRE ATT&CK/ATLAS, OWASP LLM Top 10, NIST AI RMF, and CIS v8 — as has
-**SARIF logical-location output for non-file (`lan`) findings** (ADR-16). Next:
-real-lab dogfooding (stakeholder configs + a pfSense/Suricata network lab for
-the socket and `lan` surfaces).
+[docs/proposals/VISION.md](docs/proposals/VISION.md): **`inventory` (Tier 1),
+`atlas` (Tier 2), and `trust` (Tier 4) have landed** — a classified AI/MCP asset
+list, findings mapped to MITRE ATT&CK/ATLAS, OWASP LLM Top 10, NIST AI RMF, and
+CIS v8, and a per-agent Trust Score with risk relationships — alongside **SARIF
+logical-location output for non-file (`lan`) findings** (ADR-16). Next: `graph`
+(Tier 3 — an AI attack-path graph built on the trust model) and real-lab
+dogfooding (stakeholder configs + a pfSense/Suricata network lab for the socket
+and `lan` surfaces).
 
 ## License
 
