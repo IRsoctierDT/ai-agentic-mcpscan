@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v1.2.0...ai-agentic-mcpscan-v1.3.0) (2026-07-10)
+
+
+### Features
+
+* **lan:** SARIF logical locations for network-endpoint findings (ADR-16) ([#53](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/53)) ([2b46434](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/2b464342e4015c0518d1d174a7dfb61dbaec4d91))
+
 ## [1.2.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v1.1.0...ai-agentic-mcpscan-v1.2.0) (2026-07-10)
 
 
