@@ -351,3 +351,55 @@ def test_lan_sarif_fails_closed(capsys: pytest.CaptureFixture[str], tmp_path: Pa
     err = capsys.readouterr().err
     assert "SARIF output is not supported for 'lan'" in err
     assert not (tmp_path / "x.sarif").exists()  # nothing written
+
+
+# --- inventory command (Tier 1) ---
+def test_inventory_prints_assets_and_exits_zero(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    import mcpscan.inventory.collect as collect_mod
+    from mcpscan.discovery.sockets import EnumerationResult, ListeningSocket
+
+    monkeypatch.setattr(
+        collect_mod,
+        "enumerate_listening",
+        lambda: EnumerationResult(
+            sockets=(ListeningSocket(ip="127.0.0.1", port=11434, pid=7, proc_name="ollama"),)
+        ),
+    )
+    rc = main(["inventory", "--root", str(tmp_path), "--no-probe"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "inventory" in out and "Ollama" in out
+
+
+def test_inventory_writes_json_report(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import mcpscan.inventory.collect as collect_mod
+    from mcpscan.discovery.sockets import EnumerationResult
+
+    monkeypatch.setattr(collect_mod, "enumerate_listening", lambda: EnumerationResult(sockets=()))
+    dest = tmp_path / "inv.json"
+    rc = main(["inventory", "--root", str(tmp_path), "--no-probe", "--json", str(dest)])
+    assert rc == 0
+    payload = json.loads(dest.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == "1.0"
+    assert isinstance(payload["assets"], list)
+
+
+def test_inventory_is_always_exit_zero_even_with_assets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Inventory observes; it is not a CI gate like scan's --fail-on.
+    import mcpscan.inventory.collect as collect_mod
+    from mcpscan.discovery.sockets import EnumerationResult, ListeningSocket
+
+    monkeypatch.setattr(
+        collect_mod,
+        "enumerate_listening",
+        lambda: EnumerationResult(
+            sockets=(ListeningSocket(ip="0.0.0.0", port=6333, pid=1, proc_name="qdrant"),)
+        ),
+    )
+    assert main(["inventory", "--root", str(tmp_path), "--no-probe"]) == 0

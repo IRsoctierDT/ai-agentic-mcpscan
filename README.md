@@ -27,6 +27,10 @@ command: `mcpscan`. License: Apache-2.0.
 - **Reports** a prioritized, **redacted**, advise-only remediation in four
   forms: terminal, a self-contained HTML file, stable JSON, and SARIF 2.1.0 for
   GitHub code scanning.
+- **Inventories** (`mcpscan inventory`) the machine's AI infrastructure as a
+  classified, typed asset list — agent hosts, MCP servers, model servers,
+  inference endpoints, LLM gateways, vector DBs — with per-asset evidence and
+  confidence.
 
 ## Trust properties (by design)
 
@@ -75,6 +79,7 @@ mcpscan scan --online                 # opt-in OSV enrichment (discloses egress)
 mcpscan scan --show-secrets           # reveal masked (first-2/last-2) values
 mcpscan scan --absolute-paths         # show full paths instead of ~
 mcpscan scan --fix                    # apply safe tool-scope fixes (backs up first)
+mcpscan inventory                     # classified AI/MCP asset list (see below)
 mcpscan lan  --manifest auth.toml ... # authorized network assessment (see below)
 ```
 
@@ -120,6 +125,42 @@ fixed ./.mcp.json (1 change(s); backup: ./.mcp.json.mcpscan.bak)
     removed 'Bash(*)' from permissions.allow [SCOPE-DANGEROUS-ALLOW]
 applied 1 fix(es). Re-run mcpscan to confirm.
 ```
+
+### AI/MCP asset inventory (`mcpscan inventory`)
+
+Where `scan` judges posture, `inventory` answers *what AI systems exist here* —
+it classifies what the scanner discovers (host configs, declared servers,
+listening sockets) into a typed asset list: agent hosts, MCP servers, model
+servers (Ollama, vLLM, LM Studio, llama.cpp), OpenAI-compatible inference
+endpoints, LLM gateways (LiteLLM), and vector databases (Qdrant, Chroma,
+Weaviate, Milvus). Three evidence tiers set the confidence: exact process name
+or a product endpoint fingerprint (**high**), a generic OpenAI-compatible or
+MCP transport surface (**medium**), a default-port hint alone (**low**).
+
+```
+$ mcpscan inventory
+AI Agentic MCPscan — inventory: 3 asset(s)
+
+▶ MCP servers (1)
+  MCP server (HTTP transport)  [medium confidence]
+    where:    127.0.0.1:40239
+    process:  claude (pid 552)
+    evidence: responded on /mcp (HTTP 405)
+
+▶ Model servers (1)
+  Ollama  [high confidence]
+    where:    127.0.0.1:11434
+    process:  ollama (pid 903)
+    evidence: process name 'ollama'
+…
+```
+
+Inventory **observes, never judges**: it carries no severities, always exits 0,
+and `--json` gives the stable machine-readable form. Fingerprinting stays inside
+the trust boundary — loopback-only bare GETs (`--no-probe` disables even that),
+response bodies are treated as hostile and never reach the output. Unrecognized
+services are deliberately *not* listed: a plain web server is `scan`'s exposure
+concern, not an AI asset.
 
 ### GitHub code scanning (SARIF)
 
@@ -209,10 +250,12 @@ in CI).
 From 1.0, the CLI surface, JSON report schema, and check ids are covered by
 semver: breaking changes to any of them mean a major version bump.
 
-Roadmap for 1.x: real-lab dogfooding (stakeholder configs + a pfSense/Suricata
-network lab for the socket and `lan` surfaces), SARIF logical locations for
-non-file (`lan`) findings, and the platform tiers in
-[docs/proposals/VISION.md](docs/proposals/VISION.md) (fleet inventory → atlas).
+Roadmap for 1.x, tracking the platform tiers in
+[docs/proposals/VISION.md](docs/proposals/VISION.md): **`inventory` (Tier 1) has
+landed** — a classified AI/MCP asset list. Next: `atlas` (Tier 2 — findings
+mapped to MITRE ATT&CK/ATLAS, OWASP MCP Top 10, NIST AI RMF), SARIF logical
+locations for non-file (`lan`) findings, and real-lab dogfooding (stakeholder
+configs + a pfSense/Suricata network lab for the socket and `lan` surfaces).
 
 ## License
 
