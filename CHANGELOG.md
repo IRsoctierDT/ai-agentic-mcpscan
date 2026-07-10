@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.6.0...ai-agentic-mcpscan-v0.7.0) (2026-07-10)
+
+
+### Features
+
+* **adapters:** add Zed host adapter with JSONC support ([#36](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/36)) ([a5a87b1](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/a5a87b1e7b2499880763c7461e95581ed5bbabc2))
+
+
+### Documentation
+
+* **proposals:** add LAN-scanning and real-lab dogfood design proposals ([#35](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/35)) ([62f9e40](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/62f9e403ca29145ef90e0cb0182ad5250ca6e06f))
+
 ## [0.6.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.5.0...ai-agentic-mcpscan-v0.6.0) (2026-07-10)
 
 
