@@ -6,10 +6,10 @@ name: release-please
 # version in pyproject.toml and updates CHANGELOG.md. Merging that PR tags the
 # release and creates a GitHub Release; the publish job then builds and pushes to
 # PyPI via Trusted Publishing (OIDC — no stored token), gated on the `pypi`
-# environment (add a required reviewer there for a manual production gate).
+# environment 
 #
-# NOTE: v0.1.0 is released via the manual path (.github/workflows/release.yml);
-# the manifest is seeded at 0.1.0 so release-please starts proposing 0.1.1+.
+# NOTE: v0.2.0 is released via the manual path (.github/workflows/release.yml);
+# the manifest is seeded at 0.3.0 so release-please starts proposing 0.1.1+.
 #
 # Operator step: on PyPI, add a Trusted Publisher for THIS workflow filename
 # (release-please.yml) + environment `pypi`, alongside the existing release.yml
