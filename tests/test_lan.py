@@ -9,6 +9,7 @@ import pytest
 from mcpscan.lan.audit import audit_record_to_dict, build_audit_record, digest_payload
 from mcpscan.lan.budgets import budgets_for_invoker
 from mcpscan.lan.manifest import Manifest, ManifestError, load_manifest
+from mcpscan.lan.policy import EnterprisePolicy, PolicyError, load_policy
 from mcpscan.lan.sanitize import sanitize_remote
 from mcpscan.lan.scope import ResolvedScope, ScopeError, resolve_scope
 
@@ -208,10 +209,22 @@ def test_public_target_is_refused_by_default() -> None:
     assert isinstance(err, ScopeError) and "public" in err.message
 
 
-def test_public_target_allowed_only_with_explicit_flag() -> None:
+def test_public_target_allowed_only_when_policy_covers_it() -> None:
     raw = VALID.replace(b'["192.168.10.20/32"]', b'["8.8.8.8/32"]')
-    scope = resolve_scope(_manifest(raw), "human", budgets_for_invoker("human"), allow_public=True)
+    # Covered by the enterprise allow-list -> permitted.
+    scope = resolve_scope(
+        _manifest(raw), "human", budgets_for_invoker("human"), public_allowlist=("8.8.8.0/24",)
+    )
     assert isinstance(scope, ResolvedScope) and scope.hosts == ("8.8.8.8",)
+
+
+def test_public_target_outside_policy_is_still_refused() -> None:
+    raw = VALID.replace(b'["192.168.10.20/32"]', b'["8.8.8.8/32"]')
+    # A policy that covers a *different* public range does not authorize this one.
+    err = resolve_scope(
+        _manifest(raw), "human", budgets_for_invoker("human"), public_allowlist=("1.1.1.0/24",)
+    )
+    assert isinstance(err, ScopeError) and "enterprise policy" in err.message
 
 
 def test_cidr_beyond_host_budget_is_refused() -> None:
@@ -238,6 +251,35 @@ def test_duplicate_hosts_are_deduped() -> None:
     raw = VALID.replace(b'["192.168.10.20/32"]', b'["192.168.10.20", "192.168.10.20/32"]')
     scope = resolve_scope(_manifest(raw), "human", budgets_for_invoker("human"))
     assert isinstance(scope, ResolvedScope) and scope.hosts == ("192.168.10.20",)
+
+
+# --- enterprise policy ---
+def test_valid_policy_parses_public_targets() -> None:
+    policy = load_policy(b'public_targets = ["8.8.8.0/24", "1.1.1.1/32"]')
+    assert isinstance(policy, EnterprisePolicy)
+    assert policy.public_targets == ("8.8.8.0/24", "1.1.1.1/32")
+
+
+def test_policy_bad_toml_is_error() -> None:
+    assert isinstance(load_policy(b"not = = toml"), PolicyError)
+
+
+def test_policy_missing_targets_is_error() -> None:
+    err = load_policy(b'other = "x"')
+    assert isinstance(err, PolicyError) and "public_targets" in err.message
+
+
+def test_policy_empty_targets_is_error() -> None:
+    assert isinstance(load_policy(b"public_targets = []"), PolicyError)
+
+
+def test_policy_non_string_target_is_error() -> None:
+    assert isinstance(load_policy(b"public_targets = [123]"), PolicyError)
+
+
+def test_policy_invalid_network_is_error() -> None:
+    err = load_policy(b'public_targets = ["not-an-ip"]')
+    assert isinstance(err, PolicyError) and "invalid public target" in err.message
 
 
 # --- sanitize ---

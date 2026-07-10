@@ -203,6 +203,13 @@ def test_public_target_is_refused() -> None:
     assert isinstance(out, LanRefusal) and "public" in out.reason
 
 
+def test_public_target_allowed_by_enterprise_policy() -> None:
+    raw = MANIFEST.replace(b'["192.168.10.20/32"]', b'["8.8.8.8/32"]')
+    out = _run(manifest_bytes=raw, public_allowlist=("8.8.8.0/24",))
+    assert isinstance(out, LanOutcome)
+    assert {s.bind_addr for s in out.report.servers} == {"8.8.8.8"}
+
+
 def test_agent_cidr_is_refused() -> None:
     raw = MANIFEST.replace(b'["192.168.10.20/32"]', b'["192.168.10.0/30"]')
     out = _run(manifest_bytes=raw, invoker="agent")

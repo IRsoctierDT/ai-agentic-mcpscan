@@ -6,8 +6,9 @@ Turns a manifest's raw target strings into a concrete, bounded list of hosts to
 probe — or a :class:`ScopeError`. Enforces the trust constraints:
 
 - **Private-address default.** Every resolved host must be private (RFC-1918 /
-  RFC-4193 / loopback / link-local) unless ``allow_public`` is explicitly set (an
-  enterprise-policy path, not a plain flag).
+  RFC-4193 / loopback / link-local). A public target is refused unless it is
+  covered by ``public_allowlist`` — the exact targets named in an enterprise
+  policy file, not a plain flag.
 - **Invoker gating.** ``agent`` invocations get exact hosts / ``/32`` only; a
   ``human`` may supply an explicit, budget-capped CIDR.
 - **No implicit expansion.** A bare IP is exactly one host. Only an
@@ -49,12 +50,23 @@ def _as_network(target: str) -> IPNetwork | ScopeError:
         return ScopeError(f"invalid target {target!r}: {exc}")
 
 
+def _covered_by_policy(net: IPNetwork, allowlist: tuple[str, ...] | None) -> bool:
+    """True if ``net`` is a subnet of some explicitly-authorized public target."""
+    if not allowlist:
+        return False
+    for entry in allowlist:
+        allowed = ipaddress.ip_network(entry, strict=False)
+        if net.version == allowed.version and net.subnet_of(allowed):  # type: ignore[arg-type]
+            return True
+    return False
+
+
 def resolve_scope(
     manifest: Manifest,
     invoker: Invoker,
     budgets: Budgets,
     *,
-    allow_public: bool = False,
+    public_allowlist: tuple[str, ...] | None = None,
 ) -> ResolvedScope | ScopeError:
     """Resolve manifest targets to concrete hosts, enforcing all scope rules."""
     ports = manifest.ports
@@ -76,11 +88,12 @@ def resolve_scope(
                 f"agent invocation may not use CIDR ranges (target {target!r}); supply exact hosts"
             )
 
-        # Private-address default: refuse anything routable unless explicitly allowed.
-        if not allow_public and not net.is_private:
+        # Private-address default: a public target is allowed only when an
+        # enterprise policy explicitly covers it (never a bare flag).
+        if not net.is_private and not _covered_by_policy(net, public_allowlist):
             return ScopeError(
                 f"refusing non-private target {target!r}: public addresses require an "
-                "enterprise policy, not a flag"
+                "enterprise policy (--enterprise-policy) that names them"
             )
 
         expanded = [str(net.network_address)] if is_single else [str(h) for h in net.hosts()]

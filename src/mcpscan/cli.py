@@ -124,9 +124,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="lan: verify the manifest and print the target plan without sending any packet.",
     )
     lan.add_argument(
-        "--allow-public",
-        action="store_true",
-        help="lan: permit public (non-private) targets. Requires explicit authorization.",
+        "--enterprise-policy",
+        metavar="PATH",
+        type=Path,
+        help=(
+            "lan: TOML policy naming the public (non-private) targets an organization "
+            "has authorized. Required to probe any public address."
+        ),
     )
     return parser
 
@@ -207,6 +211,7 @@ def _run_lan(args: argparse.Namespace) -> int:
     from . import __version__
     from .lan import LanRefusal, run_lan
     from .lan.audit import audit_record_to_dict
+    from .lan.policy import PolicyError, load_policy
     from .report import RenderOptions
     from .report.json_report import report_to_dict
     from .report.terminal import render_terminal
@@ -220,6 +225,22 @@ def _run_lan(args: argparse.Namespace) -> int:
     except OSError as exc:
         print(f"error: cannot read manifest {args.manifest}: {exc}", file=sys.stderr)
         return 2
+
+    public_allowlist: tuple[str, ...] | None = None
+    if args.enterprise_policy is not None:
+        try:
+            policy_bytes = args.enterprise_policy.read_bytes()
+        except OSError as exc:
+            print(
+                f"error: cannot read enterprise policy {args.enterprise_policy}: {exc}",
+                file=sys.stderr,
+            )
+            return 2
+        policy = load_policy(policy_bytes)
+        if isinstance(policy, PolicyError):
+            print(f"error: invalid enterprise policy: {policy.message}", file=sys.stderr)
+            return 2
+        public_allowlist = policy.public_targets
 
     signature = args.signature or Path(str(args.manifest) + ".sig")
     print(
@@ -236,7 +257,7 @@ def _run_lan(args: argparse.Namespace) -> int:
         argv=sys.argv,
         signature_path=signature,
         allowed_signers=args.allowed_signers,
-        allow_public=args.allow_public,
+        public_allowlist=public_allowlist,
         dry_run=args.dry_run,
     )
     if isinstance(outcome, LanRefusal):
