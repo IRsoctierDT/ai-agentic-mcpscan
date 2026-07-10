@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.3.0...ai-agentic-mcpscan-v0.4.0) (2026-07-10)
+
+
+### Features
+
+* **report:** add SARIF 2.1.0 output and code-scanning workflow ([#28](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/28)) ([f1971c5](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/f1971c558b6f695b27f25ec278bc7fabbf6bebcc))
+
 ## [0.3.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.2.0...ai-agentic-mcpscan-v0.3.0) (2026-07-08)
 
 
