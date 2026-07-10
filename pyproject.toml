@@ -13,7 +13,7 @@ license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Ivan Rozenblad", email = "irozenblad@icloud.com" }]
 keywords = ["mcp", "security", "scanner", "posture", "agent", "llm"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
