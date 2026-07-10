@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.9.0...ai-agentic-mcpscan-v0.10.0) (2026-07-10)
+
+
+### Features
+
+* add optional [crypto] ed25519 and [yaml] Continue extras ([#43](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/43)) ([2bdd484](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/2bdd4847ee3511c0214808bf50e59364978d523a))
+* **lan:** enterprise-policy gate for public targets + operator guide ([#42](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/42)) ([91680fe](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/91680fe9230a061c0e0b2b14851a988aecff5fa6))
+
 ## [0.9.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.8.0...ai-agentic-mcpscan-v0.9.0) (2026-07-10)
 
 
