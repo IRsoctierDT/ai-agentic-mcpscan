@@ -201,11 +201,14 @@ pytest on macOS/Linux/Windows × Python 3.11–3.13), with SBOM + checksums on e
 release. It's **Beta**: safe to run, but the CLI surface and check heuristics may
 still change before `v1.0.0`.
 
-Roadmap toward 1.0: real-world dogfooding and more host adapters. **Done:** SARIF
-2.1.0 output + a GitHub code-scanning workflow, opt-in `--fix` for over-broad
-tool scopes, six host adapters (Claude, Cursor, Windsurf, Cline, VS Code, Zed),
-and `mcpscan lan` — authorized, exposure-only network assessment behind a signed
-manifest.
+Roadmap toward 1.0: real-world dogfooding against stakeholder configs. **Done:**
+SARIF 2.1.0 output + a GitHub code-scanning workflow, opt-in `--fix` for
+over-broad tool scopes, **seven** host adapters (Claude, Cursor, Windsurf, Cline,
+VS Code, Zed, Continue), `mcpscan lan` — authorized, exposure-only network
+assessment behind a signed manifest — and a
+[dogfood harness](tools/dogfood/README.md) that gates every check against a
+clean+messy corpus across all hosts (0 false positives / 0 false negatives, run
+in CI).
 
 ## License
 
