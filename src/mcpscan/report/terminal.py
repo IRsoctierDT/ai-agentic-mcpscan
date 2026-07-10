@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from ..domain import Report, Severity
 from . import RenderOptions
-from .common import location_str, ordered_findings, secret_str, server_grade
+from .common import location_str, ordered_findings, server_grade
 
 _SEV_LABEL = {
     Severity.CRITICAL: "CRITICAL",
@@ -54,9 +54,6 @@ def render_terminal(report: Report, opts: RenderOptions | None = None) -> str:
             loc = location_str(finding, opts)
             lines.append(f"  [{_SEV_LABEL[finding.severity]:8}] {finding.title}")
             lines.append(f"             where: {loc}")
-            secret = secret_str(finding.secret, opts)
-            if secret is not None:
-                lines.append(f"             secret: {secret}")
             lines.append(f"             why:   {finding.rationale}")
             lines.append(f"             fix:   {finding.remediation}")
 
