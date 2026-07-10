@@ -4,8 +4,8 @@
 > local-agent setups. Find exposed servers, plaintext secrets, over-broad tool
 > scopes, and unpinned packages — then fix the highest-impact issues first.
 
-**Status:** Beta (`v0.1.x`) — safe to run (read-only, offline by default), but
-the CLI surface and check heuristics may still change before `v1.0.0`. CLI
+**Status:** Stable (`v1.x`) — safe to run (read-only, offline by default), with
+a stable CLI surface, JSON schema, and check ids covered by semver. CLI
 command: `mcpscan`. License: Apache-2.0.
 
 ## What it does (MVP)
@@ -194,21 +194,25 @@ model: [`docs/proposals/LAN_SCANNING.md`](docs/proposals/LAN_SCANNING.md).
 
 ## Status & roadmap
 
-**v0.1.0 is released on [PyPI](https://pypi.org/project/ai-agentic-mcpscan/)** —
-feature-complete across the four sprints (Foundations → Engine → Reporting →
-Integration & hardening), behind a green CI gate (ruff, mypy --strict, bandit,
-pytest on macOS/Linux/Windows × Python 3.11–3.13), with SBOM + checksums on every
-release. It's **Beta**: safe to run, but the CLI surface and check heuristics may
-still change before `v1.0.0`.
-
-Roadmap toward 1.0: real-world dogfooding against stakeholder configs. **Done:**
-SARIF 2.1.0 output + a GitHub code-scanning workflow, opt-in `--fix` for
-over-broad tool scopes, **seven** host adapters (Claude, Cursor, Windsurf, Cline,
-VS Code, Zed, Continue), `mcpscan lan` — authorized, exposure-only network
-assessment behind a signed manifest — and a
+**v1.0 is released on [PyPI](https://pypi.org/project/ai-agentic-mcpscan/)** —
+stable and production-ready, behind a green CI gate (ruff, mypy --strict, bandit,
+pytest with a 90% branch-coverage floor, on macOS/Linux/Windows × Python
+3.11–3.13), with SBOM + checksums on every release. The 1.0 bar it shipped
+against: SARIF 2.1.0 output + a GitHub code-scanning workflow, opt-in `--fix`
+for over-broad tool scopes, **seven** host adapters (Claude, Cursor, Windsurf,
+Cline, VS Code, Zed, Continue), `mcpscan lan` — authorized, exposure-only
+network assessment behind a signed manifest — and a
 [dogfood harness](tools/dogfood/README.md) that gates every check against a
 clean+messy corpus across all hosts (0 false positives / 0 false negatives, run
 in CI).
+
+From 1.0, the CLI surface, JSON report schema, and check ids are covered by
+semver: breaking changes to any of them mean a major version bump.
+
+Roadmap for 1.x: real-lab dogfooding (stakeholder configs + a pfSense/Suricata
+network lab for the socket and `lan` surfaces), SARIF logical locations for
+non-file (`lan`) findings, and the platform tiers in
+[docs/proposals/VISION.md](docs/proposals/VISION.md) (fleet inventory → atlas).
 
 ## License
 
