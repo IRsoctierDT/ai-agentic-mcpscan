@@ -96,6 +96,23 @@ def windsurf_config_candidates(
     return [home / ".codeium" / "windsurf" / "mcp_config.json"]
 
 
+def _vscode_user_dir(system: str, env: Mapping[str, str]) -> PurePath | None:
+    """Return the VS Code ``User`` profile directory for the given OS, or None.
+
+    OS-specific, mirroring the Claude Desktop layout: ``Application Support`` on
+    macOS, ``%APPDATA%`` on Windows, ``~/.config`` elsewhere. Shared by the Cline
+    (a VS Code extension) and native VS Code MCP adapters.
+    """
+    if system == "Darwin":
+        home = _home(system, env)
+        return None if home is None else home / "Library" / "Application Support" / "Code" / "User"
+    if system == "Windows":
+        appdata = env.get("APPDATA")
+        return None if not appdata else PureWindowsPath(appdata) / "Code" / "User"
+    home = _home(system, env)  # Linux and other POSIX
+    return None if home is None else home / ".config" / "Code" / "User"
+
+
 def cline_config_candidates(
     system: str,
     env: Mapping[str, str],
@@ -103,26 +120,31 @@ def cline_config_candidates(
     """Return the candidate user-level Cline MCP config path for the given OS.
 
     Cline is a VS Code extension (``saoudrizwan.claude-dev``) that stores its MCP
-    servers under the editor's ``globalStorage``. The VS Code ``User`` directory
-    is OS-specific, mirroring the Claude Desktop layout: ``Application Support``
-    on macOS, ``%APPDATA%`` on Windows, ``~/.config`` elsewhere.
+    servers under the editor's ``globalStorage``.
     """
-    tail = ("globalStorage", "saoudrizwan.claude-dev", "settings", "cline_mcp_settings.json")
+    user_dir = _vscode_user_dir(system, env)
+    if user_dir is None:
+        return []
+    return [
+        user_dir
+        / "globalStorage"
+        / "saoudrizwan.claude-dev"
+        / "settings"
+        / "cline_mcp_settings.json"
+    ]
 
-    if system == "Darwin":
-        home = _home(system, env)
-        if home is None:
-            return []
-        user_dir = home / "Library" / "Application Support" / "Code" / "User"
-    elif system == "Windows":
-        appdata = env.get("APPDATA")
-        if not appdata:
-            return []
-        user_dir = PureWindowsPath(appdata) / "Code" / "User"
-    else:  # Linux and other POSIX
-        home = _home(system, env)
-        if home is None:
-            return []
-        user_dir = home / ".config" / "Code" / "User"
 
-    return [user_dir.joinpath(*tail)]
+def vscode_config_candidates(
+    system: str,
+    env: Mapping[str, str],
+) -> list[PurePath]:
+    """Return the candidate user-level VS Code MCP config path for the given OS.
+
+    VS Code's native MCP support keeps user-level servers in ``mcp.json`` under
+    the editor's ``User`` profile directory (workspace servers live in
+    ``.vscode/mcp.json``, resolved per-project by the adapter).
+    """
+    user_dir = _vscode_user_dir(system, env)
+    if user_dir is None:
+        return []
+    return [user_dir / "mcp.json"]

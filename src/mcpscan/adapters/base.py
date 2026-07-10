@@ -55,17 +55,16 @@ def coerce_str_list(value: object) -> tuple[str, ...]:
     return ()
 
 
-def parse_mcp_servers(data: object) -> tuple[ServerDecl, ...]:
-    """Extract ``ServerDecl``s from a parsed config's ``mcpServers`` mapping.
+def _servers_from_mapping(mapping: object) -> tuple[ServerDecl, ...]:
+    """Build ``ServerDecl``s from a ``{name: spec}`` server mapping.
 
-    Shared by every host adapter: the ``mcpServers`` shape (``command``/``args``/
-    ``env``/``autoApprove`` per named server) is common to Claude, Cursor, and
-    other MCP hosts.
+    The per-server spec shape (``command``/``args``/``env``/``autoApprove``) is
+    common across MCP hosts; only the top-level key that holds this mapping
+    differs (``mcpServers`` vs VS Code's ``servers``).
     """
     servers: list[ServerDecl] = []
-    mcp_servers = data.get("mcpServers") if isinstance(data, dict) else None
-    if isinstance(mcp_servers, dict):
-        for name, spec in mcp_servers.items():
+    if isinstance(mapping, dict):
+        for name, spec in mapping.items():
             if not isinstance(spec, dict):
                 continue
             command = spec.get("command")
@@ -79,6 +78,19 @@ def parse_mcp_servers(data: object) -> tuple[ServerDecl, ...]:
                 )
             )
     return tuple(servers)
+
+
+def parse_named_servers(data: object, key: str) -> tuple[ServerDecl, ...]:
+    """Extract ``ServerDecl``s from ``data[key]`` (a ``{name: spec}`` mapping)."""
+    return _servers_from_mapping(data.get(key)) if isinstance(data, dict) else ()
+
+
+def parse_mcp_servers(data: object) -> tuple[ServerDecl, ...]:
+    """Extract ``ServerDecl``s from a parsed config's ``mcpServers`` mapping.
+
+    Shared by every Claude-lineage host adapter (Claude, Cursor, Windsurf, Cline).
+    """
+    return parse_named_servers(data, "mcpServers")
 
 
 class HostAdapter(ABC):

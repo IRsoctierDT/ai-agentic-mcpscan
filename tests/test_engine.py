@@ -234,3 +234,37 @@ def test_cline_user_level_config_is_discovered(tmp_path: Path) -> None:
     report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
     ids = {f.id for s in report.servers for f in s.findings}
     assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
+
+
+# --- VS Code host adapter (native MCP, "servers" shape) ---
+VSCODE_VULN = {
+    "servers": {
+        "leaky": {
+            "command": "npx",
+            "args": ["-y", "db-mcp-server"],
+            "env": {"POSTGRES_PASSWORD": "S3cr3t-Pa55w0rd-abcdef123456"},
+        }
+    }
+}
+
+
+def test_vscode_project_config_is_discovered(tmp_path: Path) -> None:
+    vscode_dir = tmp_path / ".vscode"
+    vscode_dir.mkdir()
+    (vscode_dir / "mcp.json").write_text(json.dumps(VSCODE_VULN), encoding="utf-8")
+    report = scan(roots=[tmp_path], system="Linux", env={}, enumerate_sockets=False)
+    leaky = [s for s in report.servers if s.id.endswith("#leaky")]
+    assert len(leaky) == 1
+    assert "mcp.json" in leaky[0].id and ".vscode" in leaky[0].id
+    ids = {f.id for f in leaky[0].findings}
+    assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
+
+
+def test_vscode_user_level_config_is_discovered(tmp_path: Path) -> None:
+    # VS Code's user-level mcp.json under the Code User profile dir.
+    user_dir = tmp_path / ".config" / "Code" / "User"
+    user_dir.mkdir(parents=True)
+    (user_dir / "mcp.json").write_text(json.dumps(VSCODE_VULN), encoding="utf-8")
+    report = scan(roots=[], system="Linux", env={"HOME": str(tmp_path)}, enumerate_sockets=False)
+    ids = {f.id for s in report.servers for f in s.findings}
+    assert {"CRED-PLAINTEXT", "PIN-UNPINNED"} <= ids
