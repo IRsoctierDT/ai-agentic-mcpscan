@@ -31,10 +31,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Optional feature extras — the base install stays stdlib-only (+ psutil).
+# `crypto`: library-based Ed25519 verification of LAN manifests (an alternative
+# to the default, dependency-free `ssh` scheme).
+crypto = ["cryptography>=41"]
+# `yaml`: parse Continue's YAML config so the Continue host adapter can audit it.
+yaml = ["pyyaml>=6"]
 dev = [
     "pytest",
     "pytest-cov",
     "pyyaml",          # dev-only: parses docs/STATUS.yaml in the status-sync test
+    "cryptography>=41",  # dev: exercise the `crypto` extra (Ed25519) in CI
     "ruff",
     "mypy",
     "types-psutil",
@@ -61,6 +68,12 @@ line-length = 100
 [tool.mypy]
 python_version = "3.11"
 strict = true
+
+# Optional feature extras: imported lazily inside try/except. Don't fail the
+# type check when their stubs/packages aren't present in the mypy environment.
+[[tool.mypy.overrides]]
+module = ["yaml", "cryptography.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

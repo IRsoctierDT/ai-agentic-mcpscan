@@ -220,6 +220,17 @@ def _run_lan(args: argparse.Namespace) -> int:
     if args.manifest is None or args.invoker is None:
         print("error: 'lan' requires --manifest and --invoker {human,agent}", file=sys.stderr)
         return 2
+    if args.sarif is not None:
+        # Fail closed rather than silently omit: LAN findings are network
+        # endpoints (host:port), not source files, so the file-scoped SARIF format
+        # cannot represent them without a logical-location design (pending). Use
+        # --json for machine-readable LAN output (report + audit).
+        print(
+            "error: SARIF output is not supported for 'lan' scans — LAN findings are "
+            "network endpoints, not source files. Use --json for machine-readable output.",
+            file=sys.stderr,
+        )
+        return 2
     try:
         manifest_bytes = args.manifest.read_bytes()
     except OSError as exc:

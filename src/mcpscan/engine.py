@@ -18,6 +18,7 @@ from pathlib import Path
 from .adapters.base import HostAdapter, ParsedConfig
 from .adapters.claude import ClaudeAdapter
 from .adapters.cline import ClineAdapter
+from .adapters.continue_ import ContinueAdapter
 from .adapters.cursor import CursorAdapter
 from .adapters.vscode import VSCodeAdapter
 from .adapters.windsurf import WindsurfAdapter
@@ -59,6 +60,7 @@ def _adapters() -> tuple[HostAdapter, ...]:
         ClineAdapter(),
         VSCodeAdapter(),
         ZedAdapter(),
+        ContinueAdapter(),
     )
 
 

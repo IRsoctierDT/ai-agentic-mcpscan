@@ -17,9 +17,11 @@ command: `mcpscan`. License: Apache-2.0.
   `claude_desktop_config.json`), **Cursor** (`~/.cursor/mcp.json`,
   `.cursor/mcp.json`), **Windsurf** (`~/.codeium/windsurf/mcp_config.json`),
   **Cline** (VS Code `globalStorage/…/cline_mcp_settings.json`), **VS Code**
-  (`.vscode/mcp.json`, user `mcp.json`), and **Zed** (`.zed/settings.json`, user
-  `~/.config/zed/settings.json`) agent configs — plus `.env` — for plaintext
-  secrets, auto-approval flags, over-broad tool scopes, and unpinned versions.
+  (`.vscode/mcp.json`, user `mcp.json`), **Zed** (`.zed/settings.json`, user
+  `~/.config/zed/settings.json`), and **Continue** (`~/.continue/config.yaml`,
+  `.continue/config.yaml` — needs the `[yaml]` extra) agent configs — plus
+  `.env` — for plaintext secrets, auto-approval flags, over-broad tool scopes,
+  and unpinned versions.
 - **Scores** each server **A–F** across four dimensions (exposure, credential
   hygiene, tool-scope breadth, version pinning).
 - **Reports** a prioritized, **redacted**, advise-only remediation in four
@@ -42,8 +44,14 @@ command: `mcpscan`. License: Apache-2.0.
 ## Install
 
 ```bash
-pipx install ai-agentic-mcpscan   # provides the `mcpscan` command
+pipx install ai-agentic-mcpscan            # provides the `mcpscan` command
+pipx install "ai-agentic-mcpscan[yaml]"    # + audit Continue's config.yaml
+pipx install "ai-agentic-mcpscan[crypto]"  # + verify ed25519 LAN manifests
 ```
+
+The base install is stdlib-only (plus `psutil`). The optional `[yaml]` and
+`[crypto]` extras enable Continue config auditing and library-based Ed25519
+manifest verification, respectively.
 
 Or from source:
 

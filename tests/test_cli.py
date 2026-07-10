@@ -175,15 +175,16 @@ def test_lan_unreadable_manifest_errors(capsys: pytest.CaptureFixture[str], tmp_
     assert "cannot read manifest" in capsys.readouterr().err
 
 
-def test_lan_ed25519_without_extra_is_refused(
+def test_lan_ed25519_without_signature_files_is_refused(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    # Real run through the CLI: ed25519 is refused before any subprocess/probe.
+    # Real run through the CLI: without --allowed-signers the ed25519 scheme is
+    # refused before any probe (the signature files are required).
     manifest = tmp_path / "auth.toml"
     manifest.write_bytes(_LAN_ED25519)
     assert main(["lan", "--manifest", str(manifest), "--invoker", "human"]) == 2
     err = capsys.readouterr().err
-    assert "refused:" in err and "crypto" in err
+    assert "refused:" in err and "requires" in err
 
 
 def test_lan_success_prints_report_and_audit(
@@ -329,3 +330,24 @@ def test_lan_valid_policy_is_loaded_then_run(
     )
     assert rc == 2
     assert "refused:" in capsys.readouterr().err  # reached run_lan past policy load
+
+
+def test_lan_sarif_fails_closed(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    # LAN + SARIF must fail closed with a precise message, not silently ignore it.
+    manifest = tmp_path / "auth.toml"
+    manifest.write_bytes(_LAN_ED25519)
+    rc = main(
+        [
+            "lan",
+            "--manifest",
+            str(manifest),
+            "--invoker",
+            "human",
+            "--sarif",
+            str(tmp_path / "x.sarif"),
+        ]
+    )
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "SARIF output is not supported for 'lan'" in err
+    assert not (tmp_path / "x.sarif").exists()  # nothing written

@@ -171,3 +171,20 @@ def zed_config_candidates(
     if home is None:
         return []
     return [home / ".config" / "zed" / "settings.json"]
+
+
+def continue_config_candidates(
+    system: str,
+    env: Mapping[str, str],
+) -> list[PurePath]:
+    """Return the candidate user-level Continue MCP config path for the given OS.
+
+    Continue keeps its config in the home-dir ``.continue`` folder on every OS
+    (``%USERPROFILE%\\.continue`` on Windows) — not ``~/Library`` or ``%APPDATA%``.
+    The current format is ``config.yaml``; project servers live in
+    ``.continue/config.yaml``, resolved per-project by the adapter.
+    """
+    home = _home(system, env)
+    if home is None:
+        return []
+    return [home / ".continue" / "config.yaml"]
