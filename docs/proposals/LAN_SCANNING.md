@@ -1,8 +1,8 @@
 # Proposal — Authorized-LAN scanning (`mcpscan lan`)
 
-**Status:** **Accepted for v1.0 scope, with enhancements** (operator review
-2026-07-10) · two sub-decisions remain (§9) · **Supersedes the "later" clause of**
-ADR-1 · **Relates to** FR-D*, NFR-SEC1, threat model §8
+**Status:** **Accepted for v1.0, with enhancements** (operator review 2026-07-10;
+sub-decisions resolved §9) · **Supersedes the "later" clause of** ADR-1 ·
+**Relates to** FR-D*, NFR-SEC1, threat model §8
 
 > **Governing principle (operator-set):** *LAN scanning discovers exposure; it
 > never converts discovery into authority.* The feature is assessment-only,
@@ -30,8 +30,9 @@ nothing broader.
 1. **Off by default, always.** Plain `mcpscan scan` stays byte-for-byte
    localhost-only. LAN lives in a **separate `mcpscan lan` subcommand** so the
    localhost path can never grow a LAN branch by accident.
-2. **Exact-target-only.** Every target is an explicit host / `/32`. No CIDR
-   ranges in v1.0, no implicit expansion of any kind (§3.3).
+2. **Explicit targets only.** Agents get exact hosts / `/32`; a human may add an
+   explicit, budget-capped CIDR. **No implicit expansion of any kind, ever**
+   (§3.3) — every target is named or an explicitly-typed range.
 3. **Attested + signed authorization**, recorded as an immutable audit record
    (§3.1).
 4. **Least-intrusive probe only** — TCP connect + the same minimal MCP/HTTP
@@ -63,9 +64,18 @@ ports            = [3000, 8000, 8080]        # explicit; no default port sweep
 ```
 
 - The manifest is **signed**; mcpscan verifies a detached signature before any
-  packet is sent. **Proposed mechanism: `ssh-keygen -Y verify`** against an
-  allowed-signers file — it reuses the operator's existing SSH keypair, is
-  ubiquitous, and needs **no Python crypto dependency**. (Sub-decision §9.1.)
+  packet is sent, via a **pluggable verifier** — the manifest declares the scheme
+  and both are supported (operator decision 2026-07-10):
+  - **`scheme = "ssh"` (default)** — `ssh-keygen -Y verify` against an
+    allowed-signers file. Reuses the operator's existing SSH keypair, ubiquitous,
+    **no Python crypto dependency**. Works out of the box.
+  - **`scheme = "ed25519"` (optional)** — verified with a vetted asymmetric
+    library, installed only via the `[crypto]` extra
+    (`pip install ai-agentic-mcpscan[crypto]`). For orgs standardizing on
+    library-based signing. Absent the extra, an `ed25519` manifest is refused
+    with a clear "install the crypto extra" message — never silently downgraded.
+
+  The default install stays stdlib-only; the crypto path is strictly opt-in.
 - mcpscan computes the manifest's **SHA-256** and writes an **immutable audit
   record** for every run: `{manifest_sha256, authorization_id, operator,
   tool_version, utc_timestamp, exact_argv, resolved_targets, results_digest}`.
@@ -83,12 +93,15 @@ ports            = [3000, 8000, 8080]        # explicit; no default port sweep
 | Authorization | signed manifest **or** interactive typed confirmation | signed manifest **required**; no interactive path |
 | Ambiguity (unresolvable scope/expiry/signature) | prompt to clarify | **non-interactive hard denial** — never prompt, never guess |
 | Rate/budget ceilings | standard (§3.4) | **tightened** (lower concurrency, longer cooldowns, smaller host cap) |
-| CIDR (post-v1.0) | allowed when gated | exact IPs only, ever |
+| CIDR | exact IPs **or** explicit budget-capped `/30`–`/24` (with an extra confirmation) | **exact IPs / `/32` only, ever** |
 
 This directly answers the autonomy risk: an agent invocation can never exceed a
 pre-signed policy, never negotiate scope interactively, and fails closed on any
 ambiguity. An agent "inheriting excessive trust" is structurally prevented — it
-gets *less* authority than a human, never more.
+gets *less* authority than a human, never more. Note the CIDR asymmetry: a
+**human** may supply an explicit, capped CIDR (never implicit, never auto-
+expanded — §3.3 still applies), while an **agent** is restricted to exact hosts
+always.
 
 ### 3.3 Prohibited in v1.0 (explicit deny-list)
 
@@ -180,13 +193,16 @@ we never read one.
 
 ## 6. Phasing
 
-1. **Phase A** — `mcpscan lan` subcommand: manifest verify + hashed audit record,
-   `--invoker` split, exact-target exposure probe, immutable budgets, hostile-
-   response sanitization, `--dry-run`, exposure-only findings, operator docs.
-2. **Phase B** — enterprise-policy file (public-target enablement, org-wide
-   ceilings), `lan_scan` SARIF block polish.
-3. **Phase C (separately gated)** — explicit CIDR for `human` invocations only,
-   behind its own decision. Not in v1.0.
+1. **Phase A** — `mcpscan lan` subcommand: manifest verify (`ssh` scheme) +
+   hashed audit record, `--invoker` split, exact-target exposure probe, immutable
+   budgets, hostile-response sanitization, `--dry-run`, exposure-only findings,
+   operator docs.
+2. **Phase B** — the `[crypto]` extra (`ed25519` manifest scheme), explicit
+   budget-capped CIDR for `human` invocations, enterprise-policy file (public-
+   target enablement, org-wide ceilings), `lan_scan` SARIF block polish.
+
+Both signature schemes and both scope modes (exact / human-CIDR) are in v1.0;
+Phase A ships the dependency-free defaults, Phase B adds the opt-in paths.
 
 ## 7. Approved v1.0 decision (recorded)
 
@@ -205,16 +221,18 @@ discovery-never-authority. The long-term shape (discovery → posture → attack
 [`VISION.md`](./VISION.md); this proposal deliberately ships only the safe,
 exposure-only foundation.
 
-## 9. Remaining sub-decisions
+## 9. Sub-decisions — resolved (both, not either/or)
 
-1. **Signature mechanism.** Default to **`ssh-keygen -Y verify`** (dependency-free,
-   uses existing SSH keys) — accept, or do you want a vetted asymmetric library
-   (e.g. `cryptography`/PyNaCl for Ed25519) as an optional extra? My rec:
-   ssh-keygen for v1.0, library later behind an extra if enterprises ask.
-2. **v1.0 CIDR.** I've set v1.0 to **exact-IP/`/32` only** (no ranges at all),
-   matching "exact-target-only," with explicit CIDR deferred to Phase C for
-   `human` invocations. Confirm, or should even explicit `/30`–`/24` be allowed
-   in v1.0 for humans?
+Operator decision 2026-07-10: **support both options in each case**, layered so
+the default install stays stdlib-only and the heavier paths are strictly opt-in.
 
-Everything else is settled by your review. On your answers to these two, Phase A
-is ready to build.
+1. **Signature mechanism — both.** `ssh` scheme (`ssh-keygen -Y verify`) is the
+   dependency-free default (Phase A); `ed25519` via a vetted library is available
+   through the `[crypto]` extra (Phase B). The manifest declares its scheme; an
+   `ed25519` manifest without the extra is refused, never downgraded.
+2. **Scope — both, invoker-gated.** `--invoker human` may use exact IPs **or** an
+   explicit, budget-capped `/30`–`/24` (with confirmation; never implicit, never
+   auto-expanded). `--invoker agent` is **exact-IP/`/32` only, always.** Exact-
+   only ships in Phase A; human-CIDR in Phase B.
+
+No open questions remain. **Phase A is ready to build** on your go-ahead.
