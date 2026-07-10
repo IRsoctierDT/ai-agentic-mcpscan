@@ -7,8 +7,10 @@ offline by default, secrets redacted unless ``--show-secrets``, and — advise-o
 by default — the only file writes are the reports the user explicitly requests
 (``--json`` / ``--html`` / ``--sarif``) plus the config edits of opt-in ``--fix``.
 
-Two commands: ``scan`` (localhost, the default surface) and ``lan`` (authorized
-network assessment — inert without a signed manifest; see ``mcpscan.lan``).
+Three commands: ``scan`` (localhost posture, the default surface), ``inventory``
+(classified AI/MCP asset list — observes, never judges; see ``mcpscan.inventory``),
+and ``lan`` (authorized network assessment — inert without a signed manifest; see
+``mcpscan.lan``).
 """
 
 from __future__ import annotations
@@ -42,8 +44,11 @@ def build_parser() -> argparse.ArgumentParser:
         "command",
         nargs="?",
         default=None,
-        choices=["scan", "lan"],
-        help="The action to run: 'scan' (localhost) or 'lan' (authorized network assessment).",
+        choices=["scan", "inventory", "lan"],
+        help=(
+            "The action to run: 'scan' (localhost posture), 'inventory' (classified "
+            "AI/MCP asset list), or 'lan' (authorized network assessment)."
+        ),
     )
     parser.add_argument(
         "--root",
@@ -92,6 +97,18 @@ def build_parser() -> argparse.ArgumentParser:
             "dangerous/wildcard entries from permission allow-lists and autoApprove. "
             "Backs up each file to <path>.mcpscan.bak first. Off by default "
             "(the tool is advise-only unless you pass --fix)."
+        ),
+    )
+
+    inventory = parser.add_argument_group(
+        "inventory", "AI/MCP asset inventory (used only with the 'inventory' command)."
+    )
+    inventory.add_argument(
+        "--no-probe",
+        action="store_true",
+        help=(
+            "inventory: skip the loopback endpoint fingerprinting; classify from "
+            "process names and default ports only."
         ),
     )
 
@@ -146,7 +163,29 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "lan":
         return _run_lan(args)
+    if args.command == "inventory":
+        return _run_inventory(args)
     return _run_scan(args)
+
+
+def _run_inventory(args: argparse.Namespace) -> int:
+    """The AI/MCP asset-inventory command (Tier 1). Observes; never judges."""
+    # Imported lazily so the default/help path stays light and import-isolated.
+    from .inventory import collect_inventory
+    from .inventory.render import render_json_inventory, render_terminal_inventory
+    from .report import RenderOptions
+    from .report.writer import write_report
+
+    inventory = collect_inventory(roots=args.root, probe=not args.no_probe)
+    opts = RenderOptions(absolute_paths=args.absolute_paths, home=str(Path.home()))
+
+    print(render_terminal_inventory(inventory, opts), end="")
+    if args.json is not None:
+        write_report(args.json, render_json_inventory(inventory, opts))
+        print(f"wrote JSON inventory: {args.json}", file=sys.stderr)
+
+    # Inventory is an observation, not a gate: it always exits 0.
+    return 0
 
 
 def _run_scan(args: argparse.Namespace) -> int:
