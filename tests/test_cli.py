@@ -403,3 +403,39 @@ def test_inventory_is_always_exit_zero_even_with_assets(
         ),
     )
     assert main(["inventory", "--root", str(tmp_path), "--no-probe"]) == 0
+
+
+# --- atlas command (Tier 2) ---
+def test_atlas_matrix_needs_no_scan(capsys: pytest.CaptureFixture[str]) -> None:
+    rc = main(["atlas", "--matrix"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "atlas reference matrix" in out and "CRED-PLAINTEXT" in out
+
+
+def test_atlas_annotates_scan_findings(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    make_report: Callable[..., Report],
+    make_finding: Callable[..., Finding],
+) -> None:
+    monkeypatch.setattr(
+        engine_mod, "scan", lambda **_: make_report(make_finding(id="CRED-PLAINTEXT"))
+    )
+    rc = main(["atlas"])
+    assert rc == 1  # same --fail-on gate as scan (critical >= high)
+    out = capsys.readouterr().out
+    assert "T1552.001" in out
+
+
+def test_atlas_writes_json(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    make_report: Callable[..., Report],
+) -> None:
+    monkeypatch.setattr(engine_mod, "scan", lambda **_: make_report())
+    dest = tmp_path / "atlas.json"
+    rc = main(["atlas", "--json", str(dest)])
+    assert rc == 0
+    payload = json.loads(dest.read_text(encoding="utf-8"))
+    assert "matrix" in payload and payload["findings"] == []

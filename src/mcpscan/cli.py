@@ -7,8 +7,9 @@ offline by default, secrets redacted unless ``--show-secrets``, and — advise-o
 by default — the only file writes are the reports the user explicitly requests
 (``--json`` / ``--html`` / ``--sarif``) plus the config edits of opt-in ``--fix``.
 
-Three commands: ``scan`` (localhost posture, the default surface), ``inventory``
+Four commands: ``scan`` (localhost posture, the default surface), ``inventory``
 (classified AI/MCP asset list — observes, never judges; see ``mcpscan.inventory``),
+``atlas`` (the same findings mapped to security frameworks; see ``mcpscan.atlas``),
 and ``lan`` (authorized network assessment — inert without a signed manifest; see
 ``mcpscan.lan``).
 """
@@ -44,10 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
         "command",
         nargs="?",
         default=None,
-        choices=["scan", "inventory", "lan"],
+        choices=["scan", "inventory", "atlas", "lan"],
         help=(
             "The action to run: 'scan' (localhost posture), 'inventory' (classified "
-            "AI/MCP asset list), or 'lan' (authorized network assessment)."
+            "AI/MCP asset list), 'atlas' (findings mapped to security frameworks), "
+            "or 'lan' (authorized network assessment)."
         ),
     )
     parser.add_argument(
@@ -97,6 +99,17 @@ def build_parser() -> argparse.ArgumentParser:
             "dangerous/wildcard entries from permission allow-lists and autoApprove. "
             "Backs up each file to <path>.mcpscan.bak first. Off by default "
             "(the tool is advise-only unless you pass --fix)."
+        ),
+    )
+
+    atlas = parser.add_argument_group(
+        "atlas", "Framework mapping (used only with the 'atlas' command)."
+    )
+    atlas.add_argument(
+        "--matrix",
+        action="store_true",
+        help=(
+            "atlas: print the full check-id → framework reference matrix without running a scan."
         ),
     )
 
@@ -165,7 +178,33 @@ def main(argv: list[str] | None = None) -> int:
         return _run_lan(args)
     if args.command == "inventory":
         return _run_inventory(args)
+    if args.command == "atlas":
+        return _run_atlas(args)
     return _run_scan(args)
+
+
+def _run_atlas(args: argparse.Namespace) -> int:
+    """The framework-mapping command (Tier 2). A citation view over scan."""
+    # Imported lazily so the default/help path stays light and import-isolated.
+    from .atlas.render import render_json_atlas, render_terminal_atlas, render_terminal_matrix
+    from .engine import scan
+    from .report import RenderOptions
+    from .report.writer import write_report
+
+    if args.matrix:
+        print(render_terminal_matrix(), end="")
+        return 0
+
+    report = scan(roots=args.root, online=args.online)
+    opts = RenderOptions(absolute_paths=args.absolute_paths, home=str(Path.home()))
+
+    print(render_terminal_atlas(report, opts), end="")
+    if args.json is not None:
+        write_report(args.json, render_json_atlas(report, opts))
+        print(f"wrote JSON atlas: {args.json}", file=sys.stderr)
+
+    # Same gate semantics as scan: the atlas is a view over the same findings.
+    return _exit_code(report, args.fail_on)
 
 
 def _run_inventory(args: argparse.Namespace) -> int:
