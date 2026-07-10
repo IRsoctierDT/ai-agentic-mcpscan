@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.4.0...ai-agentic-mcpscan-v0.5.0) (2026-07-10)
+
+
+### Features
+
+* **fix:** add opt-in --fix for over-broad tool-scope grants ([#31](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/31)) ([2fafad8](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/2fafad80e1bc94b155c5f1c8043cea6b6707cac3))
+
 ## [0.4.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v0.3.0...ai-agentic-mcpscan-v0.4.0) (2026-07-10)
 
 
