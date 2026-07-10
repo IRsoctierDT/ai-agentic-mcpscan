@@ -19,6 +19,7 @@ from .adapters.base import HostAdapter, ParsedConfig
 from .adapters.claude import ClaudeAdapter
 from .adapters.cline import ClineAdapter
 from .adapters.cursor import CursorAdapter
+from .adapters.vscode import VSCodeAdapter
 from .adapters.windsurf import WindsurfAdapter
 from .checks import EnvFile, parse_env_text
 from .checks.exposure import check_socket_exposure
@@ -50,7 +51,13 @@ OsvFetch = Callable[[str, str, str], "tuple[tuple[str, ...], bool]"]
 
 def _adapters() -> tuple[HostAdapter, ...]:
     """The registered host adapters (ADR-4), in discovery priority order."""
-    return (ClaudeAdapter(), CursorAdapter(), WindsurfAdapter(), ClineAdapter())
+    return (
+        ClaudeAdapter(),
+        CursorAdapter(),
+        WindsurfAdapter(),
+        ClineAdapter(),
+        VSCodeAdapter(),
+    )
 
 
 def discover_host_config_files(

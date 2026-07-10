@@ -8,6 +8,7 @@ from mcpscan.adapters.paths import (
     claude_config_candidates,
     cline_config_candidates,
     cursor_config_candidates,
+    vscode_config_candidates,
     windsurf_config_candidates,
 )
 
@@ -108,6 +109,30 @@ def test_cline_windows_without_appdata_yields_no_paths() -> None:
 
 def test_cline_missing_home_yields_no_paths() -> None:
     assert cline_config_candidates("Linux", {}) == []
+
+
+def test_vscode_paths_macos() -> None:
+    paths = [str(p) for p in vscode_config_candidates("Darwin", {"HOME": "/Users/jane"})]
+    assert paths == ["/Users/jane/Library/Application Support/Code/User/mcp.json"]
+
+
+def test_vscode_paths_linux() -> None:
+    paths = [str(p) for p in vscode_config_candidates("Linux", {"HOME": "/home/jane"})]
+    assert paths == ["/home/jane/.config/Code/User/mcp.json"]
+
+
+def test_vscode_paths_windows() -> None:
+    cands = vscode_config_candidates("Windows", {"APPDATA": r"C:\Users\jane\AppData\Roaming"})
+    assert any(isinstance(p, PureWindowsPath) for p in cands)
+    assert any(str(p).endswith(r"\Code\User\mcp.json") for p in cands)
+
+
+def test_vscode_windows_without_appdata_yields_no_paths() -> None:
+    assert vscode_config_candidates("Windows", {"USERPROFILE": r"C:\Users\jane"}) == []
+
+
+def test_vscode_missing_home_yields_no_paths() -> None:
+    assert vscode_config_candidates("Linux", {}) == []
 
 
 def test_windows_without_appdata_skips_desktop_config() -> None:
