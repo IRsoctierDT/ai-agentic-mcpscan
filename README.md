@@ -168,8 +168,10 @@ ports            = [3000, 8000]
 ```
 
 Sign it with your SSH key (`ssh-keygen -Y sign -n mcpscan-lan -f key auth.toml`).
-`--invoker agent` gets tighter budgets and exact-hosts-only. Full design,
-threat model, and roadmap: [`docs/proposals/LAN_SCANNING.md`](docs/proposals/LAN_SCANNING.md).
+`--invoker agent` gets tighter budgets and exact-hosts-only. Public targets are
+refused unless named in an `--enterprise-policy` file. Step-by-step:
+[`docs/LAN_OPERATOR_GUIDE.md`](docs/LAN_OPERATOR_GUIDE.md); full design and threat
+model: [`docs/proposals/LAN_SCANNING.md`](docs/proposals/LAN_SCANNING.md).
 
 ## Documentation
 

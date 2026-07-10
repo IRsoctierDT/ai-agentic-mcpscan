@@ -263,3 +263,69 @@ def test_lan_dry_run_sends_no_packet(
     assert main(["lan", "--manifest", str(manifest), "--invoker", "human", "--dry-run"]) == 0
     err = capsys.readouterr().err
     assert "[dry-run]" in err and "no packets sent" in err
+
+
+def test_lan_invalid_enterprise_policy_errors(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    manifest = tmp_path / "auth.toml"
+    manifest.write_bytes(_LAN_ED25519)
+    policy = tmp_path / "policy.toml"
+    policy.write_text("not = = toml", encoding="utf-8")
+    rc = main(
+        [
+            "lan",
+            "--manifest",
+            str(manifest),
+            "--invoker",
+            "human",
+            "--enterprise-policy",
+            str(policy),
+        ]
+    )
+    assert rc == 2
+    assert "invalid enterprise policy" in capsys.readouterr().err
+
+
+def test_lan_unreadable_enterprise_policy_errors(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    manifest = tmp_path / "auth.toml"
+    manifest.write_bytes(_LAN_ED25519)
+    rc = main(
+        [
+            "lan",
+            "--manifest",
+            str(manifest),
+            "--invoker",
+            "human",
+            "--enterprise-policy",
+            str(tmp_path / "missing.toml"),
+        ]
+    )
+    assert rc == 2
+    assert "cannot read enterprise policy" in capsys.readouterr().err
+
+
+def test_lan_valid_policy_is_loaded_then_run(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    # A valid policy loads (exercising the success path), then the ed25519
+    # manifest is refused at verification — proving the policy wiring is reached.
+    manifest = tmp_path / "auth.toml"
+    manifest.write_bytes(_LAN_ED25519)
+    policy = tmp_path / "policy.toml"
+    policy.write_text('public_targets = ["203.0.113.0/28"]', encoding="utf-8")
+    rc = main(
+        [
+            "lan",
+            "--manifest",
+            str(manifest),
+            "--invoker",
+            "human",
+            "--enterprise-policy",
+            str(policy),
+        ]
+    )
+    assert rc == 2
+    assert "refused:" in capsys.readouterr().err  # reached run_lan past policy load

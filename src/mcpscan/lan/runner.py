@@ -99,7 +99,7 @@ def run_lan(
     argv: Sequence[str],
     signature_path: Path | None = None,
     allowed_signers: Path | None = None,
-    allow_public: bool = False,
+    public_allowlist: tuple[str, ...] | None = None,
     dry_run: bool = False,
     probe_timeout: float = 1.5,
     verifier: Verifier | None = None,
@@ -127,7 +127,7 @@ def run_lan(
         return LanRefusal(verified.detail)
 
     budgets = budgets_for_invoker(invoker)
-    scope = resolve_scope(manifest, invoker, budgets, allow_public=allow_public)
+    scope = resolve_scope(manifest, invoker, budgets, public_allowlist=public_allowlist)
     if isinstance(scope, ScopeError):
         return LanRefusal(scope.message)
 
