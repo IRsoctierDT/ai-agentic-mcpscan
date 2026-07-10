@@ -332,25 +332,74 @@ def test_lan_valid_policy_is_loaded_then_run(
     assert "refused:" in capsys.readouterr().err  # reached run_lan past policy load
 
 
-def test_lan_sarif_fails_closed(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
-    # LAN + SARIF must fail closed with a precise message, not silently ignore it.
+def test_lan_sarif_emits_logical_locations(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # LAN + SARIF now emits logical locations (ADR-16), not a fail-closed refusal.
+    from mcpscan.domain import (
+        Dimension,
+        Finding,
+        Location,
+        Report,
+        Server,
+        ServerState,
+        Severity as Sev,
+    )
+    from mcpscan.lan.audit import AuditRecord
+    from mcpscan.lan.runner import LanOutcome
+
+    finding = Finding(
+        id="LAN-EXPOSED",
+        dimension=Dimension.EXPOSURE,
+        severity=Sev.HIGH,
+        title="MCP server reachable across the network at 192.168.10.20:3000",
+        location=Location(path="192.168.10.20:3000"),
+        remediation="Bind to loopback.",
+        rationale="Reachable across the LAN.",
+    )
+    server = Server(
+        id="lan://192.168.10.20:3000",
+        bind_addr="192.168.10.20",
+        port=3000,
+        pid=None,
+        proc_name=None,
+        state=ServerState.RUNNING,
+        running=True,
+        findings=(finding,),
+    )
+    report = Report(
+        schema_version="1.0",
+        servers=(server,),
+        overall_grade="C",
+        dimension_grades={Dimension.EXPOSURE: "C"},
+    )
+    audit = AuditRecord(
+        manifest_sha256="a" * 64,
+        authorization_id="ENG-42",
+        operator="op@example.com",
+        tool_version="1.0.0",
+        invoker="human",
+        utc_timestamp="2026-07-10T09:00:00Z",
+        argv=("mcpscan", "lan"),
+        resolved_targets=("192.168.10.20",),
+        results_digest="d" * 64,
+    )
+    outcome = LanOutcome(
+        report=report, audit=audit, dry_run=False, plan_hosts=("192.168.10.20",), plan_ports=(3000,)
+    )
+    monkeypatch.setattr("mcpscan.lan.run_lan", lambda **_: outcome)
     manifest = tmp_path / "auth.toml"
     manifest.write_bytes(_LAN_ED25519)
-    rc = main(
-        [
-            "lan",
-            "--manifest",
-            str(manifest),
-            "--invoker",
-            "human",
-            "--sarif",
-            str(tmp_path / "x.sarif"),
-        ]
-    )
-    assert rc == 2
-    err = capsys.readouterr().err
-    assert "SARIF output is not supported for 'lan'" in err
-    assert not (tmp_path / "x.sarif").exists()  # nothing written
+    dest = tmp_path / "lan.sarif"
+
+    rc = main(["lan", "--manifest", str(manifest), "--invoker", "human", "--sarif", str(dest)])
+    assert rc == 1  # HIGH finding is blocking
+    payload = json.loads(dest.read_text(encoding="utf-8"))
+    result = payload["runs"][0]["results"][0]
+    loc = result["locations"][0]
+    assert "physicalLocation" not in loc  # not a synthetic file
+    logical = loc["logicalLocations"][0]
+    assert logical["name"] == "192.168.10.20:3000"
+    assert logical["fullyQualifiedName"] == "lan://192.168.10.20:3000"
+    assert logical["kind"] == "resource"
 
 
 # --- inventory command (Tier 1) ---

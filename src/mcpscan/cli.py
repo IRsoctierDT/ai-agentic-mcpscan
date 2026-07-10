@@ -298,17 +298,6 @@ def _run_lan(args: argparse.Namespace) -> int:
     if args.manifest is None or args.invoker is None:
         print("error: 'lan' requires --manifest and --invoker {human,agent}", file=sys.stderr)
         return 2
-    if args.sarif is not None:
-        # Fail closed rather than silently omit: LAN findings are network
-        # endpoints (host:port), not source files, so the file-scoped SARIF format
-        # cannot represent them without a logical-location design (pending). Use
-        # --json for machine-readable LAN output (report + audit).
-        print(
-            "error: SARIF output is not supported for 'lan' scans — LAN findings are "
-            "network endpoints, not source files. Use --json for machine-readable output.",
-            file=sys.stderr,
-        )
-        return 2
     try:
         manifest_bytes = args.manifest.read_bytes()
     except OSError as exc:
@@ -375,6 +364,19 @@ def _run_lan(args: argparse.Namespace) -> int:
         }
         write_report(args.json, json.dumps(payload, indent=2, sort_keys=True) + "\n")
         print(f"wrote LAN JSON report: {args.json}", file=sys.stderr)
+
+    if args.sarif is not None:
+        # LAN findings are network endpoints, emitted as SARIF logical locations
+        # (ADR-16) — standards-valid for generic SARIF/SIEM consumers. GitHub code
+        # scanning needs a physical file and will not raise alerts from these.
+        from .report.sarif import render_sarif
+
+        write_report(args.sarif, render_sarif(outcome.report, opts, logical_locations=True))
+        print(
+            f"wrote LAN SARIF report: {args.sarif} "
+            "(logical locations; for generic SARIF/SIEM consumers, not GitHub code scanning)",
+            file=sys.stderr,
+        )
 
     return _exit_code(outcome.report, args.fail_on)
 

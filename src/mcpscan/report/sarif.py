@@ -16,8 +16,15 @@ the log.
 Scope: SARIF is a *source-file* format and GitHub requires every result URI to
 share the checkout's ``file`` scheme, so findings without a filesystem location
 — running-socket exposure, whose location is a ``host:port`` endpoint — are
-**omitted** here. They remain in the terminal, JSON, and HTML renderers; only
-this code-scanning view is file-scoped.
+**omitted** from the file-scoped (default) view. They remain in the terminal,
+JSON, and HTML renderers.
+
+Logical locations (ADR-16): with ``logical_locations=True``, a non-file finding
+is instead emitted as a SARIF ``logicalLocation`` (a network endpoint, not a
+synthetic file). This is how ``lan --sarif`` produces standards-valid SARIF for
+generic consumers (SIEM/audit pipelines, SARIF tooling) — **not** GitHub code
+scanning, which needs a physical file to raise an alert. The default ``scan``
+view keeps ``logical_locations=False`` so its GitHub integration is unchanged.
 """
 
 from __future__ import annotations
@@ -90,6 +97,32 @@ def _source_uri(path: str, base: str | None, opts: RenderOptions) -> str | None:
     return disp  # already relative, or ~/… privacy form
 
 
+def _network_endpoint(path: str) -> str | None:
+    """Return the ``host:port`` endpoint a non-file location names, or ``None``.
+
+    Recognizes a scheme-prefixed endpoint (``lan://h:p``, ``socket://h:p``) and a
+    bare ``host:port`` — but not a filesystem path or a Windows drive.
+    """
+    endpoint = path.split("://", 1)[1] if "://" in path else path
+    norm = endpoint.replace("\\", "/")
+    # A filesystem path (incl. any Windows drive like ``C:\…``) has a separator;
+    # a bare ``host:port`` — IPv4 or bracketed IPv6 — does not.
+    if "/" in norm:
+        return None
+    if ":" not in norm:
+        return None
+    return endpoint
+
+
+def _logical_location(endpoint: str) -> dict[str, object]:
+    """A SARIF ``logicalLocation`` for a network endpoint (ADR-16)."""
+    return {
+        "name": endpoint,
+        "fullyQualifiedName": f"lan://{endpoint}",
+        "kind": "resource",
+    }
+
+
 def _message(finding: Finding, opts: RenderOptions) -> str:
     """Human-readable result message (redaction-safe — never a raw secret)."""
     parts = [f"{finding.title}.", finding.rationale, f"Remediation: {finding.remediation}"]
@@ -123,7 +156,11 @@ def _rule(finding: Finding) -> dict[str, object]:
 
 
 def report_to_sarif(
-    report: Report, opts: RenderOptions | None = None, *, base: str | None = None
+    report: Report,
+    opts: RenderOptions | None = None,
+    *,
+    base: str | None = None,
+    logical_locations: bool = False,
 ) -> dict[str, object]:
     """Convert a Report to a SARIF 2.1.0 log dict (stable shape).
 
@@ -132,34 +169,51 @@ def report_to_sarif(
         opts: Cross-renderer display options (path privacy, secret reveal).
         base: Absolute path of the scanned root; locations under it become
             repo-relative URIs so GitHub code scanning can annotate them.
+        logical_locations: When True, a non-file finding (a ``host:port``
+            network endpoint) is emitted as a SARIF ``logicalLocation`` instead
+            of being dropped (ADR-16). Used by ``lan --sarif``; the default
+            file-scoped ``scan`` view keeps this False.
     """
     opts = opts or RenderOptions()
     rules: list[dict[str, object]] = []
     rule_index: dict[str, int] = {}
     results: list[dict[str, object]] = []
 
+    def _register(finding: Finding) -> int:
+        if finding.id not in rule_index:
+            rule_index[finding.id] = len(rules)
+            rules.append(_rule(finding))
+        return rule_index[finding.id]
+
+    def _result(finding: Finding, location: dict[str, object], fp_key: str) -> dict[str, object]:
+        return {
+            "ruleId": finding.id,
+            "ruleIndex": _register(finding),
+            "level": _LEVEL[finding.severity],
+            "message": {"text": _message(finding, opts)},
+            "locations": [location],
+            "partialFingerprints": {"mcpscanFindingHash/v1": _partial_fingerprint(finding, fp_key)},
+        }
+
     for server in report.servers:
         for finding in ordered_findings(server):
             uri = _source_uri(finding.location.path, base, opts)
-            if uri is None:
-                continue  # non-file location (host:port) — out of scope for code scanning
-            if finding.id not in rule_index:
-                rule_index[finding.id] = len(rules)
-                rules.append(_rule(finding))
-            physical: dict[str, object] = {"artifactLocation": {"uri": uri}}
-            if finding.location.line is not None and finding.location.line >= 1:
-                physical["region"] = {"startLine": finding.location.line}
+            if uri is not None:
+                physical: dict[str, object] = {"artifactLocation": {"uri": uri}}
+                if finding.location.line is not None and finding.location.line >= 1:
+                    physical["region"] = {"startLine": finding.location.line}
+                results.append(_result(finding, {"physicalLocation": physical}, uri))
+                continue
+            # Non-file location. Emit a logical location when asked; otherwise
+            # drop it (the file-scoped GitHub view can't represent it).
+            endpoint = _network_endpoint(finding.location.path) if logical_locations else None
+            if endpoint is None:
+                continue
+            logical = _logical_location(endpoint)
             results.append(
-                {
-                    "ruleId": finding.id,
-                    "ruleIndex": rule_index[finding.id],
-                    "level": _LEVEL[finding.severity],
-                    "message": {"text": _message(finding, opts)},
-                    "locations": [{"physicalLocation": physical}],
-                    "partialFingerprints": {
-                        "mcpscanFindingHash/v1": _partial_fingerprint(finding, uri)
-                    },
-                }
+                _result(
+                    finding, {"logicalLocations": [logical]}, str(logical["fullyQualifiedName"])
+                )
             )
 
     return {
@@ -182,8 +236,16 @@ def report_to_sarif(
 
 
 def render_sarif(
-    report: Report, opts: RenderOptions | None = None, *, base: str | None = None
+    report: Report,
+    opts: RenderOptions | None = None,
+    *,
+    base: str | None = None,
+    logical_locations: bool = False,
 ) -> str:
-    """Render a Report as deterministic, byte-stable SARIF 2.1.0 JSON text."""
-    payload = report_to_sarif(report, opts, base=base)
+    """Render a Report as deterministic, byte-stable SARIF 2.1.0 JSON text.
+
+    ``logical_locations=True`` represents non-file (network-endpoint) findings as
+    SARIF logical locations (ADR-16) — used by ``lan --sarif``.
+    """
+    payload = report_to_sarif(report, opts, base=base, logical_locations=logical_locations)
     return json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"

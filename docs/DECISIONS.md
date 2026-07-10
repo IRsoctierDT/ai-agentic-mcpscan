@@ -118,3 +118,26 @@ unless noted. These are inputs the Principal Architect validates before Sprint 1
 - **Why:** Maximizes portfolio + frontier credibility; aims at real users/stars.
 - **Consequence:** Docs, onboarding, edge-case hardening, issue templates, clean
   PyPI install are in the Definition of Done (SPEC §14).
+
+### ADR-16 — LAN SARIF: logical locations, not synthetic files
+- **Options:** (a) keep `lan --sarif` failing closed; (b) synthesize a file path
+  like `lan/192.168.1.20/8000` so GitHub annotates it; (c) emit SARIF
+  `logicalLocations` for the network endpoint.
+- **Decision:** (c). A LAN finding's location is a network endpoint
+  (`host:port`), not a source file, so it is represented as a SARIF
+  `logicalLocation` (`name` = `host:port`, `fullyQualifiedName` = `lan://host:port`,
+  `kind` = `resource`), never a physical `artifactLocation`.
+- **Consumer target (the gate that was pending):** *generic* SARIF consumers —
+  SIEM/audit pipelines and SARIF tooling (`sarif-tools`, viewers) that read
+  `logicalLocations`. **Not** GitHub code scanning: GitHub requires a
+  `physicalLocation` (a checkout file) to raise an alert, and a LAN endpoint has
+  none. `lan --sarif` therefore emits standards-valid SARIF for those consumers
+  and says so; `scan --sarif` stays file-scoped for GitHub (its own non-file
+  socket findings remain in the terminal/JSON/HTML views, unchanged).
+- **Why not a synthetic file:** inventing `lan/<ip>/<port>` would fabricate a
+  path that exists in no checkout — GitHub would either reject it or annotate a
+  file that isn't there, and it would corrupt any file-based dedup. Absence of a
+  physical location is the truth; SARIF has a first-class way to express it.
+- **Consequence:** a shared `logicalLocations` code path in `report/sarif.py`
+  (opt-in, off for the file-scoped `scan` view); `lan --sarif` no longer fails
+  closed; stable per-result fingerprints key on the `fullyQualifiedName`.

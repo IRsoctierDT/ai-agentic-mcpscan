@@ -246,7 +246,13 @@ ports            = [3000, 8000]
 
 Sign it with your SSH key (`ssh-keygen -Y sign -n mcpscan-lan -f key auth.toml`).
 `--invoker agent` gets tighter budgets and exact-hosts-only. Public targets are
-refused unless named in an `--enterprise-policy` file. Step-by-step:
+refused unless named in an `--enterprise-policy` file. `--json` and `--sarif`
+both work: because a LAN finding's location is a network endpoint (not a source
+file), `--sarif` emits it as a SARIF **logical location**
+(`kind: resource`, `fullyQualifiedName: lan://host:port`) — standards-valid for
+generic SARIF and SIEM/audit consumers, **not** GitHub code scanning (which
+needs a checkout file to raise an alert). No synthetic file path is ever
+invented; see [ADR-16](docs/DECISIONS.md). Step-by-step:
 [`docs/LAN_OPERATOR_GUIDE.md`](docs/LAN_OPERATOR_GUIDE.md); full design and threat
 model: [`docs/proposals/LAN_SCANNING.md`](docs/proposals/LAN_SCANNING.md).
 
@@ -281,10 +287,10 @@ semver: breaking changes to any of them mean a major version bump.
 Roadmap for 1.x, tracking the platform tiers in
 [docs/proposals/VISION.md](docs/proposals/VISION.md): **`inventory` (Tier 1) and
 `atlas` (Tier 2) have landed** — a classified AI/MCP asset list, and findings
-mapped to MITRE ATT&CK/ATLAS, OWASP LLM Top 10, NIST AI RMF, and CIS v8. Next:
-SARIF logical locations for non-file (`lan`) findings, and real-lab dogfooding
-(stakeholder configs + a pfSense/Suricata network lab for the socket and `lan`
-surfaces).
+mapped to MITRE ATT&CK/ATLAS, OWASP LLM Top 10, NIST AI RMF, and CIS v8 — as has
+**SARIF logical-location output for non-file (`lan`) findings** (ADR-16). Next:
+real-lab dogfooding (stakeholder configs + a pfSense/Suricata network lab for
+the socket and `lan` surfaces).
 
 ## License
 
