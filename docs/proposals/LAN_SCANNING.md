@@ -1,168 +1,220 @@
-# Proposal — Authorized-LAN scanning behind an explicit gate
+# Proposal — Authorized-LAN scanning (`mcpscan lan`)
 
-**Status:** Draft, for review · **Supersedes the "later" clause of** ADR-1 ·
-**Relates to** FR-D*, NFR-SEC1, threat model §8 · **Target:** post-1.0
+**Status:** **Accepted for v1.0 scope, with enhancements** (operator review
+2026-07-10) · two sub-decisions remain (§9) · **Supersedes the "later" clause of**
+ADR-1 · **Relates to** FR-D*, NFR-SEC1, threat model §8
 
-> This is a design proposal, not an accepted decision. It exists so the trade-offs
-> are on the table **before** any code is written, because the feature deliberately
-> touches the tool's single strongest promise: *"Localhost only — never touches the
-> LAN or third-party systems."* Nothing here changes default behavior.
+> **Governing principle (operator-set):** *LAN scanning discovers exposure; it
+> never converts discovery into authority.* The feature is assessment-only,
+> read-only, exact-target-only, and inert without explicit, attested
+> authorization. Nothing here changes the default `mcpscan scan` behavior.
+
+This revision folds in the operator's five required enhancements: a signed,
+cryptographically-scoped authorization manifest with a hashed audit record
+(§3.1), human-vs-agent invocation controls (§3.2), a hard prohibition on
+discovery expansion (§3.3), immutable operational budgets (§3.4), and
+hostile-by-default handling of every remote response (§3.5).
 
 ---
 
-## 1. Why consider this at all
+## 1. Why (unchanged)
 
-Today mcpscan finds MCP servers on **the machine it runs on**. But the real
-exposure risk is a teammate's laptop, a shared dev box, or a CI runner that has
-bound an MCP server to `0.0.0.0` and is now reachable across the office LAN or a
-cloud VPC — often unauthenticated, often exposing shell/exec-class tools. The
-person best placed to catch that is a security engineer sweeping *their own*
-network, and today they have to run mcpscan host-by-host.
+An MCP server bound to `0.0.0.0` on a teammate's laptop, a shared dev box, or a
+CI runner is reachable across the LAN/VPC — often unauthenticated, often exposing
+shell/exec-class tools. An authorized operator sweeping **hosts they own** should
+be able to detect that. The whole design exists to enable exactly that and
+nothing broader.
 
-The ask: let an **authorized** operator point mcpscan at hosts **they own or are
-explicitly permitted to test** and detect exposed MCP endpoints — without the
-tool ever becoming a network scanner that a careless (or malicious) user can aim
-at third parties.
+## 2. Non-negotiable constraints
 
-## 2. The hard constraint
+1. **Off by default, always.** Plain `mcpscan scan` stays byte-for-byte
+   localhost-only. LAN lives in a **separate `mcpscan lan` subcommand** so the
+   localhost path can never grow a LAN branch by accident.
+2. **Exact-target-only.** Every target is an explicit host / `/32`. No CIDR
+   ranges in v1.0, no implicit expansion of any kind (§3.3).
+3. **Attested + signed authorization**, recorded as an immutable audit record
+   (§3.1).
+4. **Least-intrusive probe only** — TCP connect + the same minimal MCP/HTTP
+   handshake the loopback probe uses. No auth attempts, no payloads, no banner
+   brute-forcing, no port sweeping beyond the manifest's explicit port list.
+5. **Private-address default; public = hard denial** unless an enterprise policy
+   file explicitly enables it (not a mere flag).
+6. **Exposure-only findings.** We never read a remote filesystem, so no
+   credential / pinning / tool-scope checks run against remote hosts.
+7. **Remote responses are hostile** and are sanitized before they touch a report
+   or any LLM context (§3.5).
 
-The tool's credibility rests on ADR-1 and the trust properties in the README.
-A LAN feature that erodes "localhost only" by default would be a
-self-inflicted wound on a *security* tool. Therefore the non-negotiables:
+If any of these cannot hold, we do not ship.
 
-1. **Off by default, always.** A plain `mcpscan scan` must remain byte-for-byte
-   localhost-only. No flag, no LAN. Ever.
-2. **No implicit target expansion.** The tool must never discover-and-scan hosts
-   the operator didn't name. No ARP sweeps, no "scan my whole subnet" as a side
-   effect.
-3. **Explicit authorization, recorded.** Turning it on requires the operator to
-   *assert authorization* for the specific targets, and that assertion is written
-   into the report as an audit trail.
-4. **Least-intrusive probe only.** Same behavior as the existing loopback probe:
-   a single TCP connect + minimal MCP/HTTP handshake to confirm "is an MCP
-   server listening here?" No fuzzing, no auth attempts, no payloads, no port
-   sweeps beyond the small known MCP port set.
-5. **Refuse the obviously-wrong.** Public/routable IP ranges are refused by
-   default; only RFC-1918 / RFC-4193 / loopback targets are eligible without a
-   second, louder override.
+## 3. Design
 
-If we cannot hold all five, we should not ship it.
+### 3.1 Signed authorization manifest + hashed audit record
 
-## 3. Proposed design
+Authorization is a **manifest file**, not a flag. Canonical format is **TOML**
+(parsed with stdlib `tomllib` — no new dependency; the earlier YAML sketch is
+avoided precisely to keep the tool stdlib-only):
 
-### 3.1 The authorization gate
+```toml
+authorization_id = "ENG-2026-0710"
+operator         = "j.doe@example.com"
+expires_at       = "2026-07-10T23:59:59Z"   # probes after this instant are refused
+targets          = ["192.168.10.20/32"]     # exact hosts / /32 only
+ports            = [3000, 8000, 8080]        # explicit; no default port sweep
+```
 
-Three independent conditions must all be true for a single LAN probe to fire:
+- The manifest is **signed**; mcpscan verifies a detached signature before any
+  packet is sent. **Proposed mechanism: `ssh-keygen -Y verify`** against an
+  allowed-signers file — it reuses the operator's existing SSH keypair, is
+  ubiquitous, and needs **no Python crypto dependency**. (Sub-decision §9.1.)
+- mcpscan computes the manifest's **SHA-256** and writes an **immutable audit
+  record** for every run: `{manifest_sha256, authorization_id, operator,
+  tool_version, utc_timestamp, exact_argv, resolved_targets, results_digest}`.
+  The record is emitted to the report and to an append-only local audit log.
+- `expires_at` is enforced; an expired manifest is a hard refusal.
+- A probe fires **only** for a `(target, port)` pair explicitly present in the
+  verified manifest. Anything else is refused, loudly.
 
-| Gate | Mechanism | Rationale |
+### 3.2 Human vs agent invocation
+
+`--invoker human | agent` (no default — must be stated):
+
+| | `--invoker human` | `--invoker agent` |
 |---|---|---|
-| **Intent** | `--lan <target>` flag is present (repeatable) | No accidental LAN traffic |
-| **Attestation** | `--i-am-authorized` *and* an interactive typed confirmation (skippable only with `--assume-yes` for CI, which is logged) | Forces a conscious "I own this" |
-| **Scope** | target resolves to a private range; public IPs need `--allow-public-targets` | Fail-closed on the dangerous case |
+| Authorization | signed manifest **or** interactive typed confirmation | signed manifest **required**; no interactive path |
+| Ambiguity (unresolvable scope/expiry/signature) | prompt to clarify | **non-interactive hard denial** — never prompt, never guess |
+| Rate/budget ceilings | standard (§3.4) | **tightened** (lower concurrency, longer cooldowns, smaller host cap) |
+| CIDR (post-v1.0) | allowed when gated | exact IPs only, ever |
 
-`<target>` accepts a single IP, a hostname, or a **bounded** CIDR (e.g. `/24`
-max by default; larger needs `--max-hosts N`). CIDR expansion is explicit and
-capped, never open-ended.
+This directly answers the autonomy risk: an agent invocation can never exceed a
+pre-signed policy, never negotiate scope interactively, and fails closed on any
+ambiguity. An agent "inheriting excessive trust" is structurally prevented — it
+gets *less* authority than a human, never more.
 
-### 3.2 What a probe actually does
+### 3.3 Prohibited in v1.0 (explicit deny-list)
 
-Reuse `discovery/probe.py` unchanged in spirit, extended from `127.0.0.1` to the
-authorized target:
+The following are **not implemented** and must be refused if somehow requested:
+ARP sweeping · DNS-zone enumeration · mDNS/SSDP harvesting · subnet inference
+from local interfaces · automatic `/24` (or any) CIDR expansion · credentialed
+probing · banner brute-forcing. Every host and port is supplied explicitly in
+the manifest. Discovery is enumeration of *authorized* targets, never *discovery
+of new* targets.
 
-- TCP connect to each MCP-candidate port (the existing small set: `/mcp`, `/sse`
-  probe on the known ports), with a short timeout.
-- On connect, send the **same** minimal handshake the loopback probe uses to
-  decide `looks_like_mcp`. Nothing more.
-- Record: reachable? looks like MCP? bind exposure (a remote host answering *is*
-  the exposure finding). **We cannot read a remote filesystem**, so LAN mode
-  produces **exposure findings only** — no credential/pinning/tool-scope checks
-  (those need the config file, which is local). This is a feature: it keeps the
-  remote interaction to the absolute minimum.
+### 3.4 Immutable operational budgets
 
-Concurrency is bounded (small worker pool), each host is rate-limited, and the
-whole run has a global deadline. A `--dry-run` prints the exact target list and
-port plan **without sending a packet**.
+Compile-time **ceilings** that flags may lower but never raise:
 
-### 3.3 CLI surface (illustrative)
+| Budget | Purpose |
+|---|---|
+| max hosts / run | bounds blast radius |
+| max ports / host | no port sweeps |
+| max concurrency | no network flooding |
+| max total connections / packets | hard traffic cap |
+| max wall-clock runtime | bounded engagement |
+| per-target cooldown | non-aggressive pacing |
+| **global abort switch** | one signal (SIGINT / a sentinel file) halts everything immediately |
+
+Rationale the operator flagged: AI-assisted operations compress recon timelines,
+so the safety rails must be *structural ceilings*, not advisory defaults. `agent`
+invocation gets stricter ceilings than `human` (§3.2).
+
+### 3.5 Hostile-by-default remote response handling
+
+Every byte a remote host returns is untrusted adversarial input. MCP-specific
+research flags prompt injection, tool poisoning, capability misrepresentation,
+and implicit trust propagation — so:
+
+- Remote banners, errors, tool descriptions, and MCP metadata are **never**
+  placed raw into a report, a log, or (especially) any LLM/agent context.
+- Anything surfaced is first **normalized and sanitized**: length-capped,
+  control-characters and ANSI stripped, non-UTF-8 rejected, and clearly labelled
+  as *untrusted remote data* — never interpolated into remediation prose or a
+  prompt. This extends the tool's existing "no raw secret reaches output"
+  discipline to "no raw remote bytes reach output."
+- Exposure-only detection means we read the **minimum** needed to answer "is an
+  MCP server listening here?" — we do not enumerate tools or pull descriptions in
+  v1.0.
+
+### 3.6 CLI surface (illustrative)
 
 ```
-mcpscan scan \
-  --lan 10.0.5.0/24 \
-  --lan 192.168.1.42 \
-  --i-am-authorized \
-  --max-hosts 256 \
-  --lan-timeout 1.5 \
-  --dry-run           # show plan, send nothing
+mcpscan lan \
+  --manifest ./auth/eng-2026-0710.toml \
+  --allowed-signers ./auth/allowed_signers \
+  --invoker human \
+  --dry-run                # print the verified target/port plan; send nothing
 ```
 
-Refusals are loud and specific: `refusing to scan 8.8.8.8: public IP requires
---allow-public-targets (you are asserting authorization to test this host)`.
+Refusals are specific: `refusing 8.8.8.8: public address requires an enterprise
+policy file (--enterprise-policy), not a flag`.
 
-### 3.4 Report & audit trail
+### 3.7 Report & audit trail
 
-Every LAN run stamps the report (all renderers) with:
-
-- the resolved target list and port plan,
-- the attestation record ("operator asserted authorization at <caller-supplied
-  label>"),
-- per-host reachability + MCP-detection outcome,
-- a machine-readable `lan_scan` block in JSON/SARIF.
-
-Nothing about the *remote* host's secrets can appear, because we never read them.
+All renderers stamp: the manifest hash + `authorization_id`, the invoker mode,
+the resolved target/port plan, per-host reachability + MCP-detection outcome, and
+a machine-readable `lan_scan` block (JSON/SARIF). No remote secret can appear —
+we never read one.
 
 ## 4. Threat-model additions (§8 deltas)
 
 | Risk | Mitigation |
 |---|---|
-| Tool used to scan third parties | Triple gate + private-range default + refusal messaging + recorded attestation. Not a technical guarantee of authorization, but a deliberate, logged, high-friction path — the operator owns the assertion. |
-| Accidental broad sweep | No implicit expansion; CIDR capped; `--dry-run`; global host cap. |
-| Intrusive/abusive probing | Least-intrusive connect+handshake only; bounded concurrency; rate limit; timeouts; no auth attempts, no payloads. |
-| "Security tool ships a network weapon" optics | Feature is inert without explicit flags; docs frame it as *authorized self-assessment*; SECURITY.md + a dedicated `docs/LAN_SCANNING.md` operator page state the legal/ethical boundary plainly. |
-| Egress claims broken | NFR-SEC1's "offline by default" still holds for `scan`; LAN mode is a distinct, opt-in egress path documented exactly like `--online`. |
+| Scanning third parties | Exact-target-only + signed manifest + private default + public hard-denial + recorded attestation. High-friction, logged, operator-owned. |
+| Autonomous over-reach | `--invoker agent` = signed policy only, tighter budgets, fail-closed on ambiguity, never interactive. |
+| Broad sweep / flooding | No expansion (§3.3) + immutable ceilings (§3.4) + global abort. |
+| Malicious remote response | Hostile-by-default sanitization (§3.5); nothing raw reaches report/LLM. |
+| "Security tool as weapon" optics | Inert without a signed manifest; separate subcommand; dedicated `docs/LAN_SCANNING.md` operator page states the legal/ethical boundary. |
 
 ## 5. Testing
 
-- **No real network in the suite.** The probe transport is injected (as
-  `enumerate_listening`/`osv_fetch` already are), so tests drive a fake socket
-  layer: reachable/unreachable/looks-like-mcp/timeout, and assert gate refusals.
-- Gate-logic tests: missing attestation → refuse; public IP → refuse; CIDR over
-  cap → refuse; `--dry-run` sends nothing (asserted via a transport that fails
-  the test if called).
-- A golden "authorized private /30" run producing a deterministic report block.
+- **No real network in the suite** — the probe transport is injected (as
+  `enumerate_listening` already is). Tests drive reachable/unreachable/looks-like-
+  mcp/timeout and assert every refusal path.
+- Manifest tests: bad signature → refuse; expired → refuse; target/port not in
+  manifest → refuse; public target without enterprise policy → refuse.
+- Invoker tests: `agent` + ambiguity → non-interactive denial; `agent` budgets
+  strictly tighter than `human`.
+- Budget tests: ceilings cannot be raised past the compiled cap; abort halts.
+- Sanitization tests: injected hostile banner (ANSI, control chars, prompt-
+  injection string) is neutralized and labelled, never emitted raw.
+- Golden audit-record test (deterministic given a fixed manifest + clock).
 
 ## 6. Phasing
 
-1. **Phase A — gate + single-host probe.** `--lan <ip>` for one private host, full
-   attestation gating, exposure-only findings, audit stamp. Smallest safe slice.
-2. **Phase B — bounded CIDR** with host cap + concurrency + rate limit.
-3. **Phase C — reporting polish**: `lan_scan` JSON/SARIF block, `--dry-run` plan
-   output, operator docs page.
+1. **Phase A** — `mcpscan lan` subcommand: manifest verify + hashed audit record,
+   `--invoker` split, exact-target exposure probe, immutable budgets, hostile-
+   response sanitization, `--dry-run`, exposure-only findings, operator docs.
+2. **Phase B** — enterprise-policy file (public-target enablement, org-wide
+   ceilings), `lan_scan` SARIF block polish.
+3. **Phase C (separately gated)** — explicit CIDR for `human` invocations only,
+   behind its own decision. Not in v1.0.
 
-Ship A, dogfood it (see the real-lab proposal), then B/C.
+## 7. Approved v1.0 decision (recorded)
 
-## 7. Open questions for you
+Build `mcpscan lan` as its own module with: exact-target-only scope · private-
+address default · public hard-denial unless enterprise policy · signed
+authorization manifest + hashed audit record · human-vs-agent invocation
+controls · strict immutable probing budgets · sanitized response processing ·
+exposure-only findings · **no automatic remediation or follow-on scanning.**
 
-1. **Attestation ergonomics.** Interactive typed confirmation by default with a
-   logged `--assume-yes` for CI — acceptable, or do you want a stronger artifact
-   (e.g. an authorization file listing targets + a signed-off owner)?
-2. **Default scope.** RFC-1918 + RFC-4193 + loopback only, public IPs behind a
-   second flag — right line? Or should public targets be refused outright, no
-   override, keeping the tool categorically private-only?
-3. **CIDR cap.** Default `/24` (256 hosts) with `--max-hosts` to raise — sensible
-   default, or smaller (e.g. `/27`) to force intentionality?
-4. **Scope creep guard.** Do you want LAN mode to be a *separate subcommand*
-   (`mcpscan lan ...`) rather than flags on `scan`, so the localhost path can
-   never grow a LAN code branch by accident? (I lean yes — cleaner blast-radius
-   separation.)
-5. **Naming.** `--lan` vs `--authorized-target` vs a `lan` subcommand — which
-   framing best signals "this is for hosts you own"?
+## 8. Positioning
 
-## 8. Recommendation
+`mcpscan lan` is the first network-facing module of what the operator frames as
+an **AI Infrastructure Security Platform** — assessment-oriented, read-only,
+discovery-never-authority. The long-term shape (discovery → posture → attack-path
+→ trust → drift → dashboards → advisor) is captured in
+[`VISION.md`](./VISION.md); this proposal deliberately ships only the safe,
+exposure-only foundation.
 
-Proceed **only** if we commit to the five non-negotiables in §2 and the
-separate-subcommand isolation in Q4. My recommendation: build **Phase A as a
-distinct `mcpscan lan` subcommand**, exposure-only, triple-gated, with the audit
-stamp — then validate it in the real-lab dogfood before expanding to CIDR. If any
-of the §2 constraints feels shaky to you, the right call is to **not ship** and
-keep "localhost only" absolute; the feature is worth having, but not at the cost
-of the promise that makes the tool trustworthy.
+## 9. Remaining sub-decisions
+
+1. **Signature mechanism.** Default to **`ssh-keygen -Y verify`** (dependency-free,
+   uses existing SSH keys) — accept, or do you want a vetted asymmetric library
+   (e.g. `cryptography`/PyNaCl for Ed25519) as an optional extra? My rec:
+   ssh-keygen for v1.0, library later behind an extra if enterprises ask.
+2. **v1.0 CIDR.** I've set v1.0 to **exact-IP/`/32` only** (no ranges at all),
+   matching "exact-target-only," with explicit CIDR deferred to Phase C for
+   `human` invocations. Confirm, or should even explicit `/30`–`/24` be allowed
+   in v1.0 for humans?
+
+Everything else is settled by your review. On your answers to these two, Phase A
+is ready to build.
