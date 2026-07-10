@@ -86,6 +86,12 @@ def test_display_path_relativizes_home() -> None:
     assert display_path("/etc/other", opts) == "/etc/other"
 
 
+def test_display_path_home_itself_is_tilde() -> None:
+    # The home directory rendered on its own collapses to a bare "~".
+    opts = RenderOptions(home="/home/jane")
+    assert display_path("/home/jane", opts) == "~"
+
+
 def test_display_path_is_separator_agnostic() -> None:
     # Must work regardless of the OS rendering the report (Windows CI etc.).
     win = RenderOptions(home="C:\\Users\\jane")
@@ -133,6 +139,31 @@ def test_terminal_redacts_by_default() -> None:
 def test_terminal_clean_report() -> None:
     clean = Report(schema_version="1.0", servers=(), overall_grade="A", dimension_grades={})
     assert "No findings" in render_terminal(clean)
+
+
+def test_terminal_skips_servers_without_findings() -> None:
+    # A discovered-but-clean server is present in the report yet must not print a
+    # section of its own — only the flagged server is rendered.
+    clean_server = Server(
+        id="/home/jane/.mcp.json#tidy",
+        bind_addr=None,
+        port=None,
+        pid=None,
+        proc_name=None,
+        state=ServerState.DECLARED,
+        running=False,
+        findings=(),
+    )
+    flagged = _report().servers[0]
+    report = Report(
+        schema_version="1.0",
+        servers=(clean_server, flagged),
+        overall_grade="F",
+        dimension_grades={Dimension.CREDENTIAL: "F"},
+    )
+    out = render_terminal(report, RenderOptions(home="/home/jane"))
+    assert "#tidy" not in out  # the clean server is skipped
+    assert "#leaky" in out  # the flagged server is rendered
 
 
 # --- writer perms (T-305) ---

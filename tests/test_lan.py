@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
@@ -177,6 +178,13 @@ def test_total_connection_budget_binds_independently() -> None:
 
 
 # --- scope ---
+def test_empty_target_set_resolves_to_no_hosts() -> None:
+    # A manifest that names no targets can never authorize a probe.
+    manifest = replace(_manifest(), targets=())
+    err = resolve_scope(manifest, "human", budgets_for_invoker("human"))
+    assert isinstance(err, ScopeError) and "no targets resolved" in err.message
+
+
 def test_exact_host_resolves_to_one_host() -> None:
     scope = resolve_scope(_manifest(), "agent", budgets_for_invoker("agent"))
     assert isinstance(scope, ResolvedScope)

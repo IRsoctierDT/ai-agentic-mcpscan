@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from mcpscan.adapters.base import ServerDecl
 from mcpscan.checks import parse_env_text
 from mcpscan.checks.secrets import (
@@ -51,5 +53,19 @@ def test_at_rest_clean_when_no_secret_present() -> None:
     assert check_secret_at_rest(env) == []
 
 
+def test_at_rest_flags_git_tracked_secret() -> None:
+    # A secret-bearing .env committed to git leaks to anyone with repo access,
+    # regardless of its file mode (CRED-GIT is independent of CRED-PERMS).
+    env = replace(parse_env_text("/.env", f"TOKEN={ANTHROPIC_KEY}\n", mode=0o600), git_tracked=True)
+    findings = check_secret_at_rest(env)
+    assert any(f.id == "CRED-GIT" and f.severity is Severity.HIGH for f in findings)
+    # 0o600 is not group/world-readable, so CRED-PERMS must NOT also fire.
+    assert not any(f.id == "CRED-PERMS" for f in findings)
+
+
 def test_entropy_monotonic() -> None:
     assert shannon_entropy("aaaaaaaa") < shannon_entropy("a8Fk2Lp9Qz")
+
+
+def test_entropy_of_empty_string_is_zero() -> None:
+    assert shannon_entropy("") == 0.0
