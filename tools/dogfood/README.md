@@ -29,21 +29,35 @@ a messy config missing an expected finding). The same corpus runs in CI via
 ## Adding real configs (the stakeholder pass)
 
 The bundled fixtures are synthetic and safe to commit. During the real-lab
-dogfood, collected configs are **anonymized** before they enter the corpus:
+dogfood, collected configs are **anonymized** before they enter the corpus —
+and there's a tool for it: [`anonymize.py`](anonymize.py) reuses the scanner's
+own detectors, so it scrubs exactly what a scan flags and derives a **verified**
+`expects` set:
 
-1. Scrub host/user names and any real paths.
-2. Replace real secrets with a synthetic placeholder that still trips the same
-   check (the tool never emits a raw secret, but the config *structure* must be
-   scrubbed before it lives in the repo).
-3. Add a `Fixture(...)` entry in `corpus.py` with the expected finding ids you
-   verified by hand.
+```bash
+python tools/dogfood/anonymize.py real_config.json \
+    --host cursor --scope project --relpath .cursor/mcp.json --emit-fixture
+```
+
+It (1) replaces every scanner-detected secret with a same-class synthetic — a
+provider-shaped token still matches its provider regex; an entropy-flagged value
+becomes a same-length high-entropy placeholder — so the fixture still trips the
+identical check; (2) collapses home paths (`/home/<user>`, `/Users/<user>`,
+`C:\Users\<user>`) to a generic user; and (3) prints a ready-to-paste
+`Fixture(...)` whose `expects` is what the scanner really produces on the
+scrubbed content. Paste it into `corpus.py`.
 
 Each real finding that surprised us (a false positive or false negative) becomes
 a permanent fixture here — that is how a dogfood finding turns into durable
-quality.
+quality. Write it up with the
+[triage template](../../docs/dogfood/TRIAGE_TEMPLATE.md).
 
-## What this does *not* cover
+## The network surface (socket + `lan`)
 
-The socket/exposure surface (running MCP servers) and `mcpscan lan` are validated
-separately against a real network lab (pfSense/Suricata) — see the dogfood
-proposal, §2.2. This harness is the **static-config** surface only.
+This harness is the **static-config** surface (validated in CI). The **socket
+exposure** surface and `mcpscan lan` are validated separately against a network
+lab with pfSense/Suricata as the ground-truth oracle. The operator runbook —
+exact binds, signed manifests, expected findings, and the safety *refusal*
+controls — is [`docs/dogfood/NETWORK_LAB.md`](../../docs/dogfood/NETWORK_LAB.md);
+a synthetic three-bind lab for a no-hardware dry run is in
+[`lab/synthetic/`](../../lab/synthetic/docker-compose.yml).

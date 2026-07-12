@@ -1,0 +1,46 @@
+# Copyright 2026 Ivan Rozenblad
+# SPDX-License-Identifier: Apache-2.0
+#
+# Synthetic MCP-exposure lab (T-402, Phase 2 dry run).
+#
+# Three tiny HTTP listeners standing in for MCP servers, each bound to a
+# DIFFERENT exposure class, so the socket surface and `mcpscan lan` can be
+# exercised end-to-end without the physical pfSense/Suricata lab:
+#
+#   loopback  127.0.0.1:8801  -> NOT exposed  (expect: no exposure finding)
+#   wildcard  0.0.0.0:8802     -> exposed      (expect: EXPOSE-BIND / LAN-EXPOSED)
+#   lan-iface 8803 (host net)  -> bind to a specific LAN IP via HOST_LAN_IP
+#
+# These are plain `python -m http.server` listeners answering `/mcp` is NOT
+# required for the exposure surface (that check is about the *bind address*, not
+# the protocol) — the point is the reachability ground truth, which Suricata /
+# pfSense confirms independently.
+#
+# Usage:
+#   HOST_LAN_IP=192.168.10.20 docker compose -f lab/synthetic/docker-compose.yml up -d
+#   mcpscan scan                      # observe the socket exposure classification
+#   docker compose -f lab/synthetic/docker-compose.yml down
+#
+# NOTE: this stands up *deliberately exposed* listeners. Run it only on a lab
+# host you control and tear it down after. It ships no secret and serves an
+# empty directory.
+
+services:
+  mcp-loopback:
+    image: python:3.12-alpine
+    command: ["python", "-m", "http.server", "8801", "--bind", "127.0.0.1"]
+    network_mode: host
+    restart: "no"
+
+  mcp-wildcard:
+    image: python:3.12-alpine
+    command: ["python", "-m", "http.server", "8802", "--bind", "0.0.0.0"]
+    network_mode: host
+    restart: "no"
+
+  mcp-lan-iface:
+    image: python:3.12-alpine
+    # Binds to a specific LAN interface address (not loopback, not wildcard).
+    command: ["python", "-m", "http.server", "8803", "--bind", "${HOST_LAN_IP:-127.0.0.1}"]
+    network_mode: host
+    restart: "no"
