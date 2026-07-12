@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v1.3.0...ai-agentic-mcpscan-v1.4.0) (2026-07-12)
+
+
+### Features
+
+* **dogfood:** add Phase-2 tooling — config anonymizer and network-lab runbook ([#55](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/55)) ([5f63052](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/5f63052dca40cc90197add7d01802d4cff39f5f3))
+* **drift:** add Tier-5 baseline + diff drift detection ([#56](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/56)) ([77aadbd](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/77aadbd7ddaed80b42980bce1bdc0b569ef3295b))
+* **trust:** add Tier-4 agent trust analysis ([#57](https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues/57)) ([d982723](https://github.com/IRsoctierDT/ai-agentic-mcpscan/commit/d982723ddb4b964587a8ed5b88226923e2dc13a0))
+
 ## [1.3.0](https://github.com/IRsoctierDT/ai-agentic-mcpscan/compare/ai-agentic-mcpscan-v1.2.0...ai-agentic-mcpscan-v1.3.0) (2026-07-10)
 
 
