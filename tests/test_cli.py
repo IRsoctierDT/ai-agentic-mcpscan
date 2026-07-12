@@ -488,3 +488,62 @@ def test_atlas_writes_json(
     assert rc == 0
     payload = json.loads(dest.read_text(encoding="utf-8"))
     assert "matrix" in payload and payload["findings"] == []
+
+
+# --- trust command (Tier 4) ---
+def test_trust_reports_score_and_relationships(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    (tmp_path / ".mcp.json").write_text(
+        json.dumps(
+            {
+                "mcpServers": {
+                    "db": {
+                        "command": "npx",
+                        "args": ["pg-mcp"],
+                        "env": {"PGPASSWORD": "sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUVWX0123456789"},
+                        "autoApprove": ["run_command"],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    rc = main(["trust", "--root", str(tmp_path)])
+    assert rc == 0  # no --min-grade gate
+    out = capsys.readouterr().out
+    assert "agent trust" in out and "PRIVILEGED-SECRET-HOLDER" in out
+
+
+def test_trust_min_grade_gate(tmp_path: Path) -> None:
+    (tmp_path / ".mcp.json").write_text(
+        json.dumps(
+            {
+                "mcpServers": {
+                    "db": {
+                        "command": "npx",
+                        "args": ["pg-mcp"],
+                        "env": {"PGPASSWORD": "sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUVWX0123456789"},
+                        "autoApprove": ["run_command"],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    # This tool grades well below B -> the gate fails.
+    assert main(["trust", "--root", str(tmp_path), "--min-grade", "B"]) == 1
+
+
+def test_trust_clean_config_passes_gate_and_writes_json(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / ".mcp.json").write_text(
+        json.dumps({"mcpServers": {"safe": {"command": "npx", "args": ["x@1.2.3"]}}}),
+        encoding="utf-8",
+    )
+    dest = tmp_path / "trust.json"
+    rc = main(["trust", "--root", str(tmp_path), "--min-grade", "A", "--json", str(dest)])
+    assert rc == 0
+    payload = json.loads(dest.read_text(encoding="utf-8"))
+    assert payload["profiles"][0]["score"] == 100

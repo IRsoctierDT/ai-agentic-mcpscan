@@ -7,11 +7,12 @@ offline by default, secrets redacted unless ``--show-secrets``, and — advise-o
 by default — the only file writes are the reports the user explicitly requests
 (``--json`` / ``--html`` / ``--sarif``) plus the config edits of opt-in ``--fix``.
 
-Four commands: ``scan`` (localhost posture, the default surface), ``inventory``
+Commands: ``scan`` (localhost posture, the default surface), ``inventory``
 (classified AI/MCP asset list — observes, never judges; see ``mcpscan.inventory``),
 ``atlas`` (the same findings mapped to security frameworks; see ``mcpscan.atlas``),
-and ``lan`` (authorized network assessment — inert without a signed manifest; see
-``mcpscan.lan``).
+``trust`` (a per-agent Trust Score and the risky factor combinations; see
+``mcpscan.trust``), and ``lan`` (authorized network assessment — inert without a
+signed manifest; see ``mcpscan.lan``).
 """
 
 from __future__ import annotations
@@ -45,11 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
         "command",
         nargs="?",
         default=None,
-        choices=["scan", "inventory", "atlas", "lan"],
+        choices=["scan", "inventory", "atlas", "trust", "lan"],
         help=(
             "The action to run: 'scan' (localhost posture), 'inventory' (classified "
             "AI/MCP asset list), 'atlas' (findings mapped to security frameworks), "
-            "or 'lan' (authorized network assessment)."
+            "'trust' (per-agent Trust Score + risk relationships), or 'lan' "
+            "(authorized network assessment)."
         ),
     )
     parser.add_argument(
@@ -111,6 +113,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "atlas: print the full check-id → framework reference matrix without running a scan."
         ),
+    )
+
+    trust = parser.add_argument_group(
+        "trust", "Agent trust analysis (used only with the 'trust' command)."
+    )
+    trust.add_argument(
+        "--min-grade",
+        choices=("A", "B", "C", "D", "F"),
+        help="trust: exit non-zero if any agent tool grades below this Trust grade.",
     )
 
     inventory = parser.add_argument_group(
@@ -180,7 +191,34 @@ def main(argv: list[str] | None = None) -> int:
         return _run_inventory(args)
     if args.command == "atlas":
         return _run_atlas(args)
+    if args.command == "trust":
+        return _run_trust(args)
     return _run_scan(args)
+
+
+_GRADE_RANK = {"A": 0, "B": 1, "C": 2, "D": 3, "F": 4}
+
+
+def _run_trust(args: argparse.Namespace) -> int:
+    """The agent-trust command (Tier 4). Scores what each tool is trusted with."""
+    from .report import RenderOptions
+    from .report.writer import write_report
+    from .trust import collect_trust
+    from .trust.render import render_json_trust, render_terminal_trust
+
+    report = collect_trust(roots=args.root)
+    opts = RenderOptions(absolute_paths=args.absolute_paths, home=str(Path.home()))
+
+    print(render_terminal_trust(report, opts), end="")
+    if args.json is not None:
+        write_report(args.json, render_json_trust(report, opts))
+        print(f"wrote trust JSON: {args.json}", file=sys.stderr)
+
+    if args.min_grade is not None:
+        floor = _GRADE_RANK[args.min_grade]
+        if any(_GRADE_RANK[p.grade] > floor for p in report.profiles):
+            return 1
+    return 0
 
 
 def _run_atlas(args: argparse.Namespace) -> int:
