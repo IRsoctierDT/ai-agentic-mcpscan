@@ -547,3 +547,99 @@ def test_trust_clean_config_passes_gate_and_writes_json(
     assert rc == 0
     payload = json.loads(dest.read_text(encoding="utf-8"))
     assert payload["profiles"][0]["score"] == 100
+
+
+# --- baseline / diff commands (Tier 5) ---
+def test_baseline_writes_snapshot_then_diff_is_clean(tmp_path: Path) -> None:
+    # A project with an exposed tool-scope grant produces findings; baseline then
+    # diff against the unchanged tree reports no drift.
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(
+        json.dumps({"mcpServers": {}, "permissions": {"allow": ["Bash(*)"]}}), encoding="utf-8"
+    )
+    base = tmp_path / "baseline.json"
+    rc = main(["baseline", "--root", str(tmp_path), "--no-inventory", "--out", str(base)])
+    assert rc == 0
+    payload = json.loads(base.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == "1.0" and "digest" in payload
+
+    rc = main(["diff", "--root", str(tmp_path), "--no-inventory", "--baseline", str(base)])
+    assert rc == 0  # no drift, no regression
+
+
+def test_diff_flags_regression_when_finding_appears(tmp_path: Path) -> None:
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(json.dumps({"mcpServers": {}, "permissions": {"allow": ["Read"]}}), "utf-8")
+    base = tmp_path / "baseline.json"
+    assert main(["baseline", "--root", str(tmp_path), "--no-inventory", "--out", str(base)]) == 0
+
+    # Introduce a dangerous grant -> a new finding -> a regression.
+    cfg.write_text(
+        json.dumps({"mcpServers": {}, "permissions": {"allow": ["Bash(*)"]}}), encoding="utf-8"
+    )
+    rc = main(
+        [
+            "diff",
+            "--root",
+            str(tmp_path),
+            "--no-inventory",
+            "--baseline",
+            str(base),
+            "--fail-on-regression",
+        ]
+    )
+    assert rc == 1  # regression -> non-zero under the gate
+
+
+def test_diff_requires_baseline(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["diff"]) == 2
+    assert "requires --baseline" in capsys.readouterr().err
+
+
+def test_diff_unreadable_baseline_errors(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    assert main(["diff", "--baseline", str(tmp_path / "nope.json")]) == 2
+    assert "cannot read baseline" in capsys.readouterr().err
+
+
+def test_diff_corrupt_baseline_errors(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not valid json", encoding="utf-8")
+    assert main(["diff", "--baseline", str(bad)]) == 2
+    assert "malformed" in capsys.readouterr().err
+
+
+def test_baseline_to_stdout_when_no_out(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    rc = main(["baseline", "--root", str(tmp_path), "--no-inventory"])
+    assert rc == 0
+    assert '"schema_version"' in capsys.readouterr().out
+
+
+def test_baseline_with_inventory_and_diff_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Exercise the default (inventory-included) baseline path and diff --json.
+    import mcpscan.inventory.collect as collect_mod
+    from mcpscan.discovery.sockets import EnumerationResult
+
+    monkeypatch.setattr(collect_mod, "enumerate_listening", lambda: EnumerationResult(sockets=()))
+    base = tmp_path / "baseline.json"
+    assert main(["baseline", "--root", str(tmp_path), "--no-probe", "--out", str(base)]) == 0
+
+    drift_json = tmp_path / "drift.json"
+    rc = main(
+        [
+            "diff",
+            "--root",
+            str(tmp_path),
+            "--no-probe",
+            "--baseline",
+            str(base),
+            "--json",
+            str(drift_json),
+        ]
+    )
+    assert rc == 0
+    payload = json.loads(drift_json.read_text(encoding="utf-8"))
+    assert payload["summary"]["total"] == 0  # unchanged posture

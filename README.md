@@ -84,6 +84,8 @@ mcpscan atlas                         # findings mapped to security frameworks
 mcpscan atlas --matrix                # the full check-id -> framework matrix
 mcpscan trust                         # per-agent Trust Score + risk relationships
 mcpscan trust --min-grade B           # CI: fail if any tool grades below B
+mcpscan baseline --out base.json      # snapshot current posture (digest-signed)
+mcpscan diff --baseline base.json     # drift vs the baseline (regressions first)
 mcpscan lan  --manifest auth.toml ... # authorized network assessment (see below)
 ```
 
@@ -194,6 +196,32 @@ tools). Scoring reuses the exact predicates `scan` trusts, so the two never
 diverge. `--min-grade` makes it a CI gate; `--json` emits the full analysis; a
 profile is **secretless** (a credential count, never a value). Read-only and
 offline.
+
+### Drift detection (`mcpscan baseline` / `mcpscan diff`)
+
+Turn the one-shot scan into continuous posture. `mcpscan baseline` writes a
+normalized, byte-stable snapshot of the current posture (findings, server
+exposure, and the AI/MCP inventory) with an integrity digest; `mcpscan diff`
+compares a fresh scan against it and reports what drifted — **regressions
+first**:
+
+```
+$ mcpscan diff --baseline base.json --fail-on-regression
+AI Agentic MCPscan — drift: 4 change(s) (2 regression(s), 0 improvement(s))
+  + [REGRESSION ] SCOPE-DANGEROUS-ALLOW — Dangerous tool auto-allowed: 'Bash(*)'
+  + [REGRESSION ] PIN-UNPINNED — Server 'db' runs an unpinned package via npx
+  ~ [REGRESSION ] socket://…:8000   exposure: local → exposed
+```
+
+The direction is the point: a **new finding** or a **newly-exposed** server is a
+regression; a **resolved finding** or a server that stopped being exposed is an
+improvement; new/removed assets are informational. A *disappearing security
+control* surfaces as a new finding (the check that the control was present now
+fires). `--fail-on-regression` exits non-zero **only** on regressions, so
+`diff` drops into CI to block posture backsliding — commit a signed baseline,
+then diff every change against it. The baseline's digest is re-verified on load,
+so an edited or corrupted baseline is refused rather than trusted. `--json`
+emits the full machine-readable drift; `--no-inventory` snapshots posture only.
 
 ### Framework mapping (`mcpscan atlas`)
 
@@ -317,13 +345,14 @@ semver: breaking changes to any of them mean a major version bump.
 
 Roadmap for 1.x, tracking the platform tiers in
 [docs/proposals/VISION.md](docs/proposals/VISION.md): **`inventory` (Tier 1),
-`atlas` (Tier 2), and `trust` (Tier 4) have landed** — a classified AI/MCP asset
-list, findings mapped to MITRE ATT&CK/ATLAS, OWASP LLM Top 10, NIST AI RMF, and
-CIS v8, and a per-agent Trust Score with risk relationships — alongside **SARIF
-logical-location output for non-file (`lan`) findings** (ADR-16). Next: `graph`
-(Tier 3 — an AI attack-path graph built on the trust model) and real-lab
-dogfooding (stakeholder configs + a pfSense/Suricata network lab for the socket
-and `lan` surfaces).
+`atlas` (Tier 2), `trust` (Tier 4), and `baseline`/`diff` drift detection
+(Tier 5) have landed** — a classified AI/MCP asset list, findings mapped to
+MITRE ATT&CK/ATLAS, OWASP LLM Top 10, NIST AI RMF, and CIS v8, a per-agent Trust
+Score with risk relationships, and a CI gate against posture backsliding —
+alongside **SARIF logical-location output for non-file (`lan`) findings**
+(ADR-16). Next: `graph` (Tier 3 — an AI attack-path graph built on the trust
+model) and real-lab dogfooding (stakeholder configs + a pfSense/Suricata network
+lab for the socket and `lan` surfaces).
 
 ## License
 

@@ -11,8 +11,9 @@ Commands: ``scan`` (localhost posture, the default surface), ``inventory``
 (classified AI/MCP asset list — observes, never judges; see ``mcpscan.inventory``),
 ``atlas`` (the same findings mapped to security frameworks; see ``mcpscan.atlas``),
 ``trust`` (a per-agent Trust Score and the risky factor combinations; see
-``mcpscan.trust``), and ``lan`` (authorized network assessment — inert without a
-signed manifest; see ``mcpscan.lan``).
+``mcpscan.trust``), ``baseline`` / ``diff`` (a posture snapshot and drift against
+it; see ``mcpscan.drift``), and ``lan`` (authorized network assessment — inert
+without a signed manifest; see ``mcpscan.lan``).
 """
 
 from __future__ import annotations
@@ -21,9 +22,13 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from . import __version__
 from .domain import Report, Severity
+
+if TYPE_CHECKING:
+    from .drift import Snapshot
 
 _THRESHOLDS = {
     "critical": (Severity.CRITICAL,),
@@ -46,12 +51,13 @@ def build_parser() -> argparse.ArgumentParser:
         "command",
         nargs="?",
         default=None,
-        choices=["scan", "inventory", "atlas", "trust", "lan"],
+        choices=["scan", "inventory", "atlas", "trust", "baseline", "diff", "lan"],
         help=(
             "The action to run: 'scan' (localhost posture), 'inventory' (classified "
             "AI/MCP asset list), 'atlas' (findings mapped to security frameworks), "
-            "'trust' (per-agent Trust Score + risk relationships), or 'lan' "
-            "(authorized network assessment)."
+            "'trust' (per-agent Trust Score + risk relationships), 'baseline' (write "
+            "a posture snapshot), 'diff' (drift vs a baseline), or 'lan' (authorized "
+            "network assessment)."
         ),
     )
     parser.add_argument(
@@ -102,6 +108,32 @@ def build_parser() -> argparse.ArgumentParser:
             "Backs up each file to <path>.mcpscan.bak first. Off by default "
             "(the tool is advise-only unless you pass --fix)."
         ),
+    )
+
+    drift = parser.add_argument_group(
+        "drift", "Baseline & drift (used only with 'baseline' / 'diff')."
+    )
+    drift.add_argument(
+        "--out",
+        metavar="PATH",
+        type=Path,
+        help="baseline: write the snapshot here (default: stdout).",
+    )
+    drift.add_argument(
+        "--baseline",
+        metavar="PATH",
+        type=Path,
+        help="diff: the baseline snapshot to compare the current posture against.",
+    )
+    drift.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="diff: exit non-zero if any change is a posture regression.",
+    )
+    drift.add_argument(
+        "--no-inventory",
+        action="store_true",
+        help="baseline/diff: snapshot posture only, skipping the AI/MCP asset inventory.",
     )
 
     atlas = parser.add_argument_group(
@@ -193,6 +225,10 @@ def main(argv: list[str] | None = None) -> int:
         return _run_atlas(args)
     if args.command == "trust":
         return _run_trust(args)
+    if args.command == "baseline":
+        return _run_baseline(args)
+    if args.command == "diff":
+        return _run_diff(args)
     return _run_scan(args)
 
 
@@ -218,6 +254,72 @@ def _run_trust(args: argparse.Namespace) -> int:
         floor = _GRADE_RANK[args.min_grade]
         if any(_GRADE_RANK[p.grade] > floor for p in report.profiles):
             return 1
+    return 0
+
+
+def _posture_snapshot(args: argparse.Namespace) -> Snapshot:
+    """Run a scan (+ inventory unless --no-inventory) and build a drift Snapshot."""
+    from .drift import build_snapshot
+    from .engine import scan
+
+    report = scan(roots=args.root, online=args.online)
+    inventory = None
+    if not args.no_inventory:
+        from .inventory import collect_inventory
+
+        inventory = collect_inventory(roots=args.root, probe=not args.no_probe)
+    return build_snapshot(report, inventory)
+
+
+def _run_baseline(args: argparse.Namespace) -> int:
+    """Write a signed-by-digest posture snapshot (Tier 5)."""
+    from datetime import datetime, timezone
+
+    from .drift import render_baseline
+    from .report.writer import write_report
+
+    snapshot = _posture_snapshot(args)
+    created_at = datetime.now(timezone.utc).isoformat()
+    text = render_baseline(snapshot, created_at=created_at)
+
+    if args.out is not None:
+        write_report(args.out, text)
+        print(f"wrote baseline: {args.out} ({len(snapshot.facts)} facts)", file=sys.stderr)
+    else:
+        print(text, end="")
+    return 0
+
+
+def _run_diff(args: argparse.Namespace) -> int:
+    """Compare the current posture against a baseline snapshot (Tier 5)."""
+    from .drift import BaselineError, diff_snapshots, load_baseline
+    from .drift.render import render_json_drift, render_terminal_drift
+    from .report.writer import write_report
+
+    if args.baseline is None:
+        print("error: 'diff' requires --baseline PATH", file=sys.stderr)
+        return 2
+    try:
+        baseline_text = args.baseline.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"error: cannot read baseline {args.baseline}: {exc}", file=sys.stderr)
+        return 2
+    try:
+        baseline = load_baseline(baseline_text)
+    except BaselineError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    current = _posture_snapshot(args)
+    report = diff_snapshots(baseline, current)
+
+    print(render_terminal_drift(report), end="")
+    if args.json is not None:
+        write_report(args.json, render_json_drift(report))
+        print(f"wrote drift JSON: {args.json}", file=sys.stderr)
+
+    if args.fail_on_regression and report.regressions:
+        return 1
     return 0
 
 
