@@ -49,6 +49,9 @@ jobs:
           python-version: "3.11"
       - run: |
           python -m pip install --upgrade pip
+          # PYSEC-2026-3447: runner env ships vulnerable setuptools; upgrade
+          # before auditing so pip-audit checks a clean environment.
+          python -m pip install --upgrade "setuptools>=83.0.0"
           python -m pip install -e ".[dev]"
       - name: SAST (bandit)
         run: bandit -r src
