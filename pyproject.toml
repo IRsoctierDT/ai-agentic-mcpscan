@@ -42,7 +42,10 @@ dev = [
     "pytest-cov",
     "pyyaml",          # dev-only: parses docs/STATUS.yaml in the status-sync test
     "cryptography>=41",  # dev: exercise the `crypto` extra (Ed25519) in CI
-    "ruff",
+    # Pinned: a newer ruff started flagging RUF100 on `noqa: S1xx/S3xx`
+    # directives for rules this config never enables, breaking CI on every
+    # branch. Bump deliberately together with a noqa cleanup.
+    "ruff==0.15.20",
     "mypy",
     "types-psutil",
     "bandit",
@@ -51,9 +54,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/IRsoctierDT/ai-agentic-mcpscan"
-Repository = "https://github.com/IRsoctierDT/ai-agentic-mcpscan"
-Issues = "https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues"
+Homepage = "https://github.com/IRsoctierDT/IANUA-Broker"
+Repository = "https://github.com/IRsoctierDT/IANUA-Broker"
+Issues = "https://github.com/IRsoctierDT/IANUA-Broker/issues"
 
 [project.scripts]
 mcpscan = "mcpscan.cli:main"

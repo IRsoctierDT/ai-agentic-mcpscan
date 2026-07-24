@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: 🔒 Report a security vulnerability
-    url: https://github.com/IRsoctierDT/ai-agentic-mcpscan/security/advisories/new
+    url: https://github.com/IRsoctierDT/IANUA-Broker/security/advisories/new
     about: >-
       Please report vulnerabilities privately via a GitHub Security Advisory,
       not a public issue. See SECURITY.md.

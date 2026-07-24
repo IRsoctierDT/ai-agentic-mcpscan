@@ -42,7 +42,7 @@ SARIF_SCHEMA = (
 )
 SARIF_VERSION = "2.1.0"
 TOOL_NAME = "ai-agentic-mcpscan"
-INFORMATION_URI = "https://github.com/IRsoctierDT/ai-agentic-mcpscan"
+INFORMATION_URI = "https://github.com/IRsoctierDT/IANUA-Broker"
 
 # Severity -> SARIF result level (error | warning | note).
 _LEVEL: dict[Severity, str] = {

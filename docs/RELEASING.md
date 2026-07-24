@@ -10,7 +10,7 @@ API token is ever stored in the repo. The `Release` workflow
    use "pending publisher"):
    - PyPI → your account → *Publishing* → *Add a pending publisher*.
    - Project name: `ai-agentic-mcpscan`
-   - Owner: `IRsoctierDT` · Repository: `ai-agentic-mcpscan`
+   - Owner: `IRsoctierDT` · Repository: `IANUA-Broker`
    - Workflow filename: `release.yml`
    - Environment name: `pypi`
 2. **(Recommended) Protect the `pypi` environment** in GitHub:
