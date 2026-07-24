@@ -51,9 +51,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/IRsoctierDT/ai-agentic-mcpscan"
-Repository = "https://github.com/IRsoctierDT/ai-agentic-mcpscan"
-Issues = "https://github.com/IRsoctierDT/ai-agentic-mcpscan/issues"
+Homepage = "https://github.com/IRsoctierDT/IANUA-Broker"
+Repository = "https://github.com/IRsoctierDT/IANUA-Broker"
+Issues = "https://github.com/IRsoctierDT/IANUA-Broker/issues"
 
 [project.scripts]
 mcpscan = "mcpscan.cli:main"

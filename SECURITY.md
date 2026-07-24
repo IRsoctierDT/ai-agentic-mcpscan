@@ -6,7 +6,7 @@ AI Agentic MCPscan is a security tool, so we hold its own posture to a high bar.
 
 Please report suspected vulnerabilities **privately**:
 
-- Open a [GitHub security advisory](https://github.com/IRsoctierDT/ai-agentic-mcpscan/security/advisories/new)
+- Open a [GitHub security advisory](https://github.com/IRsoctierDT/IANUA-Broker/security/advisories/new)
   (preferred), or
 - Open a regular issue **without** sensitive details and ask for a private
   channel.
