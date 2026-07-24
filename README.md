@@ -60,8 +60,8 @@ manifest verification, respectively.
 Or from source:
 
 ```bash
-git clone https://github.com/IRsoctierDT/ai-agentic-mcpscan.git
-cd ai-agentic-mcpscan && pipx install .
+git clone https://github.com/IRsoctierDT/IANUA-Broker.git
+cd IANUA-Broker && pipx install .
 ```
 
 Requires **Python 3.11+** (macOS, Linux, Windows).

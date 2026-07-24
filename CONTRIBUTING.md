@@ -6,8 +6,8 @@ tooling, so contributions are held to a clear bar.
 ## Quick start
 
 ```bash
-git clone https://github.com/IRsoctierDT/ai-agentic-mcpscan.git
-cd ai-agentic-mcpscan
+git clone https://github.com/IRsoctierDT/IANUA-Broker.git
+cd IANUA-Broker
 python -m venv .venv && . .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```

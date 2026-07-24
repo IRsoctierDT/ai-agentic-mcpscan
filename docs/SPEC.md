@@ -247,7 +247,7 @@ All previously-open assumptions are now confirmed by the stakeholder:
 
 | ID | Item | Resolution |
 |---|---|---|
-| A-REPO | Repo location | **Own repo** — `ai-agentic-mcpscan` (separate from `ai-dev-team`, which holds the team). |
+| A-REPO | Repo location | **Own repo** — `IANUA-Broker` (formerly `ai-agentic-mcpscan`; separate from `ai-dev-team`, which holds the team). |
 | A-SCORE | Rubric thresholds (§6) | **Accepted** as written. |
 | A-CHECKS | Check catalog (§5.2) breadth | **Accepted** — no additional checks for MVP. |
 | A-PY | Python baseline | **3.11 floor** (stdlib `tomllib`, in security support, broad install base); CI tests 3.11→3.13. |
